@@ -73,38 +73,38 @@ class BackendVendorRepository implements IVendorRepository {
     throw Exception(response.errorMessage ?? 'Failed to load test centres');
   }
 
-  ApplicationStatus _mapStatus(String status) {
+  VendorApplicationStatus _mapStatus(String status) {
     switch (status) {
       case 'SUBMITTED':
-        return ApplicationStatus.submitted;
+        return VendorApplicationStatus.submitted;
       case 'DOCUMENTS_PENDING':
-        return ApplicationStatus.documentReview;
+        return VendorApplicationStatus.documentReview;
       case 'DOCUMENTS_VERIFIED':
-        return ApplicationStatus.documentReview;
+        return VendorApplicationStatus.documentReview;
       case 'SLOT_BOOKED':
-        return ApplicationStatus.scheduled;
+        return VendorApplicationStatus.scheduled;
       case 'PAYMENT_PENDING':
-        return ApplicationStatus.paymentPending;
+        return VendorApplicationStatus.paymentPending;
       case 'PAYMENT_COMPLETE':
-        return ApplicationStatus.paymentComplete;
+        return VendorApplicationStatus.paymentComplete;
       case 'LMO_ASSIGNED':
-        return ApplicationStatus.lmoAssigned;
+        return VendorApplicationStatus.lmoAssigned;
       case 'INSPECTION_IN_PROGRESS':
-        return ApplicationStatus.inspectionInProgress;
+        return VendorApplicationStatus.inspectionInProgress;
       case 'INSPECTION_COMPLETE':
-        return ApplicationStatus.inspectionInProgress;
+        return VendorApplicationStatus.inspectionInProgress;
       case 'PASSED':
-        return ApplicationStatus.passed;
+        return VendorApplicationStatus.passed;
       case 'FAILED':
-        return ApplicationStatus.rejected;
+        return VendorApplicationStatus.rejected;
       case 'REJECTED':
-        return ApplicationStatus.rejected;
+        return VendorApplicationStatus.rejected;
       case 'CANCELLED':
-        return ApplicationStatus.rejected;
+        return VendorApplicationStatus.rejected;
       case 'CERTIFICATE_ISSUED':
-        return ApplicationStatus.certificateIssued;
+        return VendorApplicationStatus.certificateIssued;
       default:
-        return ApplicationStatus.submitted;
+        return VendorApplicationStatus.submitted;
     }
   }
 
