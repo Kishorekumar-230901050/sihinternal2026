@@ -13,7 +13,13 @@ class DemoRoleBanner extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final user = context.watch<AuthProvider>().currentUser;
-    if (user == null) return const SizedBox.shrink();
+    if (user == null) {
+      return const Positioned(
+        bottom: 0,
+        right: 0,
+        child: SizedBox(width: 1, height: 1),
+      );
+    }
 
     final isVendor = user.isVendor;
     final roleLabel = isVendor ? 'VENDOR' : 'LMO';
@@ -32,7 +38,7 @@ class DemoRoleBanner extends StatelessWidget {
             borderRadius: BorderRadius.circular(28),
             boxShadow: [
               BoxShadow(
-                color: roleColor.withOpacity(0.4),
+                color: roleColor.withValues(alpha: 0.4),
                 blurRadius: 12,
                 offset: const Offset(0, 4),
               ),
