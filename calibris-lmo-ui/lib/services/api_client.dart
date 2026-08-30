@@ -1,7 +1,21 @@
 import 'dart:convert';
 import 'dart:typed_data';
 import 'package:http/http.dart' as http;
+import 'package:http_parser/http_parser.dart';
 import 'token_storage_service.dart';
+
+/// Guesses the MIME type from a filename extension. The backend's multer
+/// fileFilter rejects anything outside jpeg/png/webp/pdf, and
+/// MultipartFile.fromBytes defaults to application/octet-stream when no
+/// contentType is given — which the filter always rejects.
+MediaType _guessMediaType(String filename) {
+  final lower = filename.toLowerCase();
+  if (lower.endsWith('.png')) return MediaType('image', 'png');
+  if (lower.endsWith('.webp')) return MediaType('image', 'webp');
+  if (lower.endsWith('.pdf')) return MediaType('application', 'pdf');
+  if (lower.endsWith('.jpg') || lower.endsWith('.jpeg')) return MediaType('image', 'jpeg');
+  return MediaType('image', 'jpeg');
+}
 
 class ApiResponse<T> {
   final bool success;
@@ -149,6 +163,7 @@ class ApiClient {
           fieldName,
           fileBytes,
           filename: filename,
+          contentType: _guessMediaType(filename),
         ),
       );
 

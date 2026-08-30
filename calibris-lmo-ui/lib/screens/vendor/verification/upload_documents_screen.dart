@@ -68,7 +68,7 @@ class _UploadDocumentsScreenState extends State<UploadDocumentsScreen> {
     try {
       final result = await FilePicker.platform.pickFiles(
         type: FileType.custom,
-        allowedExtensions: ['pdf', 'png', 'jpg', 'jpeg', 'doc', 'docx'],
+        allowedExtensions: ['pdf', 'png', 'jpg', 'jpeg', 'webp'],
         withData: true,
       );
 

@@ -49,7 +49,12 @@ class _FieldVerificationScreenState extends State<FieldVerificationScreen> {
         distanceFromRegistered: dist,
         withinGeofence: isWithin,
       );
-      await inspectionProvider.syncLocation(pos.latitude, pos.longitude);
+      final synced = await inspectionProvider.syncLocation(pos.latitude, pos.longitude);
+      if (!synced && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('GPS captured locally but failed to sync to the server. Try again before submitting.')),
+        );
+      }
     }
     
     if (mounted) {

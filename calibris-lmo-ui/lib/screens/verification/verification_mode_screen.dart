@@ -167,9 +167,15 @@ class VerificationModeScreen extends StatelessWidget {
                       ),
                       onPressed: () async {
                         final officerId = context.read<AuthProvider>().currentUser?.id ?? '';
-                        await context.read<InspectionProvider>().startInspection(applicationId, officerId, VerificationMode.digital);
-                        if (context.mounted) {
+                        final inspection = context.read<InspectionProvider>();
+                        final success = await inspection.startInspection(applicationId, officerId, VerificationMode.digital);
+                        if (!context.mounted) return;
+                        if (success) {
                           context.pushNamed(AppRoutes.digitalVerification, pathParameters: {'id': applicationId});
+                        } else {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text(inspection.errorMessage ?? 'Failed to start inspection')),
+                          );
                         }
                       },
                     ),
@@ -232,9 +238,15 @@ class VerificationModeScreen extends StatelessWidget {
                       ),
                       onPressed: () async {
                         final officerId = context.read<AuthProvider>().currentUser?.id ?? '';
-                        await context.read<InspectionProvider>().startInspection(applicationId, officerId, VerificationMode.field);
-                        if (context.mounted) {
+                        final inspection = context.read<InspectionProvider>();
+                        final success = await inspection.startInspection(applicationId, officerId, VerificationMode.field);
+                        if (!context.mounted) return;
+                        if (success) {
                           context.pushNamed(AppRoutes.fieldVerification, pathParameters: {'id': applicationId});
+                        } else {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text(inspection.errorMessage ?? 'Failed to start inspection')),
+                          );
                         }
                       },
                     ),

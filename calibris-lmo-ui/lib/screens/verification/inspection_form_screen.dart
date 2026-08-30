@@ -58,6 +58,10 @@ class _InspectionFormScreenState extends State<InspectionFormScreen> {
             ? provider.currentInspection!.id
             : (widget.applicationId.isNotEmpty ? widget.applicationId : 'INSP-001');
         context.pushReplacementNamed(AppRoutes.verificationSummary, pathParameters: {'id': targetId});
+      } else if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(provider.errorMessage ?? 'Failed to submit inspection result')),
+        );
       }
     }
   }

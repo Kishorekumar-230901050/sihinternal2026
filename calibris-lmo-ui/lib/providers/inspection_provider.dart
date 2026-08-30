@@ -6,19 +6,22 @@ import '../data/repositories/i_inspection_repository.dart';
 
 class InspectionProvider extends ChangeNotifier {
   final IInspectionRepository _repository;
-  
+
   InspectionModel? _currentInspection;
   List<InspectionModel> _history = [];
   bool _isLoading = false;
+  String? _errorMessage;
 
   InspectionProvider(this._repository);
 
   InspectionModel? get currentInspection => _currentInspection;
   List<InspectionModel> get history => _history;
   bool get isLoading => _isLoading;
+  String? get errorMessage => _errorMessage;
 
-  Future<void> startInspection(String applicationId, String officerId, VerificationMode mode) async {
+  Future<bool> startInspection(String applicationId, String officerId, VerificationMode mode) async {
     _isLoading = true;
+    _errorMessage = null;
     notifyListeners();
 
     try {
@@ -32,6 +35,10 @@ class InspectionProvider extends ChangeNotifier {
         createdAt: DateTime.now(),
       );
       _currentInspection = await _repository.createInspection(newInspection);
+      return true;
+    } catch (e) {
+      _errorMessage = e.toString().replaceFirst('Exception: ', '');
+      return false;
     } finally {
       _isLoading = false;
       notifyListeners();
@@ -52,7 +59,7 @@ class InspectionProvider extends ChangeNotifier {
     bool? withinGeofence,
   }) {
     if (_currentInspection == null) return;
-    
+
     _currentInspection = _currentInspection!.copyWith(
       physicalCondition: physicalCondition ?? _currentInspection!.physicalCondition,
       sealCondition: sealCondition ?? _currentInspection!.sealCondition,
@@ -69,14 +76,25 @@ class InspectionProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> syncLocation(double lat, double lng) async {
-    if (_currentInspection == null) return;
-    await _repository.updateInspectionLocation(_currentInspection!.applicationId, lat, lng);
+  /// Pushes a refined GPS reading to the backend. Returns false (and sets
+  /// errorMessage) on failure rather than throwing, since this is a
+  /// best-effort refinement of a location already recorded at inspection
+  /// start — a failure here shouldn't block the rest of the inspection.
+  Future<bool> syncLocation(double lat, double lng) async {
+    if (_currentInspection == null) return false;
+    try {
+      await _repository.updateInspectionLocation(_currentInspection!.applicationId, lat, lng);
+      return true;
+    } catch (e) {
+      _errorMessage = e.toString().replaceFirst('Exception: ', '');
+      notifyListeners();
+      return false;
+    }
   }
 
   void addMeasurement(MeasurementModel m) {
     if (_currentInspection == null) return;
-    
+
     final updatedMeasurements = List<MeasurementModel>.from(_currentInspection!.measurements)..add(m);
     _currentInspection = _currentInspection!.copyWith(measurements: updatedMeasurements);
     notifyListeners();
@@ -84,7 +102,7 @@ class InspectionProvider extends ChangeNotifier {
 
   void addPhoto(PhotoEvidenceModel p) {
     if (_currentInspection == null) return;
-    
+
     final updatedPhotos = List<PhotoEvidenceModel>.from(_currentInspection!.photos)..add(p);
     _currentInspection = _currentInspection!.copyWith(photos: updatedPhotos);
     notifyListeners();
@@ -94,6 +112,7 @@ class InspectionProvider extends ChangeNotifier {
     if (_currentInspection == null) return false;
 
     _isLoading = true;
+    _errorMessage = null;
     notifyListeners();
 
     try {
@@ -106,6 +125,7 @@ class InspectionProvider extends ChangeNotifier {
       _currentInspection = await _repository.submitInspection(_currentInspection!.id);
       return true;
     } catch (e) {
+      _errorMessage = e.toString().replaceFirst('Exception: ', '');
       return false;
     } finally {
       _isLoading = false;

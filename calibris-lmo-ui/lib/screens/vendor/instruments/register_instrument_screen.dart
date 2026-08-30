@@ -58,7 +58,17 @@ class _RegisterInstrumentScreenState extends State<RegisterInstrumentScreen> {
       isDigitalCompatible: _isDigital,
     );
 
-    await context.read<VendorProvider>().registerInstrument(instrument);
+    try {
+      await context.read<VendorProvider>().registerInstrument(instrument);
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isSubmitting = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(e.toString().replaceFirst('Exception: ', ''))),
+        );
+      }
+      return;
+    }
 
     if (mounted) {
       setState(() => _isSubmitting = false);
