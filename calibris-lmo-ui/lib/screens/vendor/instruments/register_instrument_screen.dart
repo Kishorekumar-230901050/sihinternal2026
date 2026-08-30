@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
-import 'package:qr_flutter/qr_flutter.dart';
 import '../../../providers/vendor_provider.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../data/models/instrument_model.dart';
@@ -105,18 +104,14 @@ class _RegisterInstrumentScreenState extends State<RegisterInstrumentScreen> {
                   style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.primary, letterSpacing: 1),
                 ),
               ),
-              const SizedBox(height: 16),
-              SizedBox(
-                width: 130,
-                height: 130,
-                child: QrImageView(
-                  data: 'https://calibris.gov.in/inst/$uniqueId',
-                  version: QrVersions.auto,
-                  size: 130,
-                ),
-              ),
               const SizedBox(height: 8),
               Text('Serial No: ${instrument.serialNumber}', style: const TextStyle(fontSize: 11, color: AppColors.textHint)),
+              const SizedBox(height: 12),
+              const Text(
+                'A QR-verifiable certificate will be issued once an LMO officer passes this instrument\'s verification.',
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 11, color: AppColors.textSecondary, fontStyle: FontStyle.italic),
+              ),
             ],
           ),
           actions: [

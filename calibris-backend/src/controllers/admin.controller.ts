@@ -3,8 +3,7 @@ import bcrypt from "bcryptjs";
 import { z } from "zod";
 import { prisma } from "../db";
 import { transitionApplication } from "../services/status.service";
-import { generateCertificatePdf } from "../services/pdf.service";
-import { uploadFile } from "../services/storage.service";
+import { issueCertificateForApplication } from "../services/certificate.service";
 
 const SALT_ROUNDS = 10;
 
@@ -128,74 +127,19 @@ export async function assignLmo(req: Request, res: Response) {
   res.json(updated);
 }
 
-/** Approves a PASSED application, generates the certificate PDF + QR, and issues it. */
+/**
+ * Manual fallback: generates the certificate PDF + QR for a PASSED
+ * application. Normally unnecessary — the LMO's PASS submission already
+ * auto-issues the certificate — but kept for applications passed before
+ * that behavior existed, or if auto-issuance ever fails.
+ */
 export async function approveCertificate(req: Request, res: Response) {
   const applicationId = req.params.applicationId;
   const adminId = req.auth!.sub;
 
-  const application = await prisma.application.findUnique({
-    where: { id: applicationId },
-    include: {
-      vendor: true,
-      instrument: { include: { instrumentType: true } },
-      gatc: true,
-      assignedLmo: true,
-      inspection: { include: { result: true } },
-    },
-  });
-  if (!application) return res.status(404).json({ error: "Application not found" });
-  if (application.status !== "PASSED") {
-    return res.status(409).json({ error: `Application must be in PASSED status, currently ${application.status}` });
-  }
+  const verifyBaseUrl = `${req.protocol}://${req.get("host")}/verify`;
+  const updatedCert = await issueCertificateForApplication(applicationId, { type: "ADMIN", id: adminId }, verifyBaseUrl);
 
-  const certificateNo = `CAL-${new Date().getFullYear()}-${application.id.slice(-8).toUpperCase()}`;
-  const issuedAt = new Date();
-  const validUntil = new Date(issuedAt);
-  validUntil.setFullYear(validUntil.getFullYear() + 1);
-
-  const certificate = await prisma.certificate.create({
-    data: { applicationId, certificateNo, issuedAt, validUntil },
-  });
-
-  const pdfBuffer = await generateCertificatePdf({
-    certificateNo: certificate.certificateNo,
-    qrToken: certificate.qrToken,
-    verifyBaseUrl: `${req.protocol}://${req.get("host")}/verify`,
-    vendorName: application.vendor.fullName,
-    businessName: application.vendor.businessName,
-    instrumentTypeName: application.instrument.instrumentType.name,
-    serialNumber: application.instrument.serialNumber,
-    gatcName: application.gatc?.name ?? "N/A",
-    lmoName: application.assignedLmo?.fullName ?? "N/A",
-    issuedAt,
-    validUntil,
-    resultRemarks: application.inspection?.result?.remarks,
-  });
-
-  const { url } = await uploadFile(pdfBuffer, `certificate-${certificate.certificateNo}.pdf`, "application/pdf");
-
-  const updatedCert = await prisma.certificate.update({
-    where: { id: certificate.id },
-    data: {
-      pdfUrl: url,
-      versions: {
-        create: {
-          versionNumber: 1,
-          snapshotJson: {
-            certificateNo: certificate.certificateNo,
-            vendorName: application.vendor.fullName,
-            instrumentType: application.instrument.instrumentType.name,
-            serialNumber: application.instrument.serialNumber,
-            issuedAt,
-            validUntil,
-          },
-          pdfUrl: url,
-        },
-      },
-    },
-  });
-
-  await transitionApplication(applicationId, "CERTIFICATE_ISSUED", { type: "ADMIN", id: adminId }, "Certificate approved and issued");
   await prisma.auditLog.create({
     data: { adminId, action: "APPROVE_CERTIFICATE", entityType: "Application", entityId: applicationId },
   });

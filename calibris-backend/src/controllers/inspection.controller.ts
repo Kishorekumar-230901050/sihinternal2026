@@ -3,6 +3,7 @@ import { z } from "zod";
 import { prisma } from "../db";
 import { transitionApplication } from "../services/status.service";
 import { uploadFile } from "../services/storage.service";
+import { issueCertificateForApplication } from "../services/certificate.service";
 
 /** LMO dashboard: assigned/pending/completed counts + today's inspections. */
 export async function lmoDashboard(req: Request, res: Response) {
@@ -177,6 +178,13 @@ export async function submitResult(req: Request, res: Response) {
     { type: "LMO", id: lmoId },
     parsed.data.remarks
   );
+
+  // PASS immediately issues the certificate — no separate department
+  // approval step. FAILED applications stop here.
+  if (parsed.data.status === "PASSED") {
+    const verifyBaseUrl = `${req.protocol}://${req.get("host")}/verify`;
+    await issueCertificateForApplication(applicationId, { type: "LMO", id: lmoId }, verifyBaseUrl);
+  }
 
   res.status(201).json(result);
 }
