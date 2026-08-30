@@ -40,9 +40,9 @@ class BackendVendorRepository implements IVendorRepository {
             capacity: m['capacity']?.toString() ?? '150 kg',
             accuracyClass: m['accuracyClass']?.toString() ?? 'Class III',
             type: (typeObj?['code'] == 'WB')
-                ? InstrumentType.weighbridge
+                ? InstrumentType.platformWeighbridge
                 : (typeObj?['code'] == 'FDS')
-                    ? InstrumentType.fuelDispenser
+                    ? InstrumentType.petrolPumpDispenser
                     : InstrumentType.electronicWeighingScale,
             registeredLocationLat: 19.0183,
             registeredLocationLng: 72.8478,

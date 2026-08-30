@@ -118,6 +118,9 @@ class VendorApplicationModel {
   }
 
   VendorApplicationModel copyWith({
+    String? id,
+    String? vendorId,
+    String? instrumentId,
     VendorApplicationStatus? status,
     DocumentReviewStatus? documentStatus,
     String? reuploadReason,
@@ -138,11 +141,12 @@ class VendorApplicationModel {
     DateTime? geotagTimestamp,
     String? geotagPhotoUrl,
     DateTime? updatedAt,
+    InstrumentInfo? instrumentInfo,
   }) {
     return VendorApplicationModel(
-      id: id,
-      vendorId: vendorId,
-      instrumentId: instrumentId,
+      id: id ?? this.id,
+      vendorId: vendorId ?? this.vendorId,
+      instrumentId: instrumentId ?? this.instrumentId,
       isReverification: isReverification ?? this.isReverification,
       verificationMethod: verificationMethod ?? this.verificationMethod,
       gatcId: gatcId ?? this.gatcId,
@@ -164,7 +168,7 @@ class VendorApplicationModel {
       geotagPhotoUrl: geotagPhotoUrl ?? this.geotagPhotoUrl,
       createdAt: createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
-      instrumentInfo: instrumentInfo,
+      instrumentInfo: instrumentInfo ?? this.instrumentInfo,
     );
   }
 }
