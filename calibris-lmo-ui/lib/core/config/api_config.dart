@@ -1,6 +1,6 @@
 class ApiConfig {
   // Configurable base URL: can be overridden at build time using:
-  // flutter run --dart-define=API_BASE_URL=https://your-backend.com/api
+  // flutter run --dart-define=API_BASE_URL=http://localhost:3000/api
   static const String defaultBaseUrl = 'http://localhost:3000/api';
   static const String defaultWsUrl = 'http://localhost:3000';
 
@@ -13,14 +13,56 @@ class ApiConfig {
   static String get wsUrl {
     const fromEnv = String.fromEnvironment('WS_URL');
     if (fromEnv.isNotEmpty) return fromEnv;
-    // Derive WS URL from baseUrl if not specified
     if (baseUrl.endsWith('/api')) {
       return baseUrl.substring(0, baseUrl.length - 4);
     }
     return defaultWsUrl;
   }
 
-  // Endpoints
+  // ── Auth Endpoints ──────────────────────────────────────────────
+  static String get authVendorRegister => '$baseUrl/auth/vendor/register';
+  static String get authVendorLogin => '$baseUrl/auth/vendor/login';
+  static String get authLmoLogin => '$baseUrl/auth/lmo/login';
+  static String get authAdminLogin => '$baseUrl/auth/admin/login';
+
+  // ── Vendor Endpoints ────────────────────────────────────────────
+  static String get vendorInstrumentTypes => '$baseUrl/vendor/instrument-types';
+  static String get vendorInstruments => '$baseUrl/vendor/instruments';
+  static String get vendorApplications => '$baseUrl/vendor/applications';
+  static String vendorApplication(String id) => '$baseUrl/vendor/applications/$id';
+  static String vendorCancelApplication(String id) => '$baseUrl/vendor/applications/$id/cancel';
+  static String vendorApplicationDocuments(String applicationId) =>
+      '$baseUrl/vendor/applications/$applicationId/documents';
+
+  static String get vendorGatcs => '$baseUrl/vendor/gatcs';
+  static String vendorGatc(String id) => '$baseUrl/vendor/gatcs/$id';
+  static String get vendorGatcAvailability => '$baseUrl/vendor/gatcs/availability/slots';
+  static String get vendorAppointments => '$baseUrl/vendor/appointments';
+
+  static String get vendorPaymentOrders => '$baseUrl/vendor/payments/orders';
+  static String get vendorPaymentSimulateCheckout => '$baseUrl/vendor/payments/simulate-checkout';
+  static String get vendorPaymentVerify => '$baseUrl/vendor/payments/verify';
+  static String vendorPaymentReceipt(String orderRef) => '$baseUrl/vendor/payments/$orderRef/receipt';
+
+  static String vendorCertificate(String applicationId) =>
+      '$baseUrl/vendor/applications/$applicationId/certificate';
+
+  // ── LMO Endpoints ───────────────────────────────────────────────
+  static String get lmoQueue => '$baseUrl/lmo/queue';
+  static String lmoApplication(String id) => '$baseUrl/lmo/applications/$id';
+  static String lmoStartInspection(String applicationId) =>
+      '$baseUrl/lmo/applications/$applicationId/inspection/start';
+  static String lmoDiscrepancies(String applicationId) =>
+      '$baseUrl/lmo/applications/$applicationId/inspection/discrepancies';
+  static String lmoInspectionPhotos(String applicationId) =>
+      '$baseUrl/lmo/applications/$applicationId/inspection/photos';
+  static String lmoInspectionResult(String applicationId) =>
+      '$baseUrl/lmo/applications/$applicationId/inspection/result';
+
+  // ── Public Endpoints ────────────────────────────────────────────
+  static String publicVerifyQr(String qrToken) => '$baseUrl/verify/$qrToken';
+
+  // ── Luckfox IoT Endpoints ───────────────────────────────────────
   static String get devices => '$baseUrl/devices';
   static String device(String id) => '$baseUrl/devices/$id';
   static String deviceStatus(String id) => '$baseUrl/devices/$id/status';

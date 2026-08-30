@@ -24,11 +24,21 @@ import 'data/repositories/mock_certificate_repository.dart';
 import 'data/repositories/mock_vendor_repository.dart';
 
 // Services
+import 'services/api_client.dart';
+import 'services/token_storage_service.dart';
 import 'services/backend_device_service.dart';
 import 'services/websocket_service.dart';
 import 'services/mock_certificate_service.dart';
 import 'services/location_service.dart';
 import 'services/i_certificate_service.dart';
+import 'core/config/api_config.dart';
+
+// Backend Repositories
+import 'data/repositories/backend_auth_repository.dart';
+import 'data/repositories/backend_application_repository.dart';
+import 'data/repositories/backend_inspection_repository.dart';
+import 'data/repositories/backend_notification_repository.dart';
+import 'data/repositories/backend_vendor_repository.dart';
 
 // ── Auth screen ──
 import 'screens/auth/unified_login_screen.dart';
@@ -73,15 +83,30 @@ class LmoApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tokenStorage = TokenStorageService();
+    final apiClient = ApiClient(
+      baseUrl: ApiConfig.baseUrl,
+      tokenStorage: tokenStorage,
+    );
+
+    final authRepo = BackendAuthRepository(apiClient: apiClient, tokenStorage: tokenStorage);
+    final vendorRepo = BackendVendorRepository(apiClient: apiClient);
+    final appRepo = BackendApplicationRepository(apiClient: apiClient);
+    final inspRepo = BackendInspectionRepository(apiClient: apiClient);
+    final notifRepo = BackendNotificationRepository(apiClient: apiClient);
+
     return MultiProvider(
       providers: [
+        Provider<TokenStorageService>.value(value: tokenStorage),
+        Provider<ApiClient>.value(value: apiClient),
+
         // ── Auth (shared) ──
-        ChangeNotifierProvider(create: (_) => AuthProvider(MockAuthRepository())),
+        ChangeNotifierProvider(create: (_) => AuthProvider(authRepo)),
 
         // ── LMO providers ──
-        ChangeNotifierProvider(create: (_) => ApplicationProvider(MockApplicationRepository())),
-        ChangeNotifierProvider(create: (_) => InspectionProvider(MockInspectionRepository())),
-        ChangeNotifierProvider(create: (_) => NotificationProvider(MockNotificationRepository())),
+        ChangeNotifierProvider(create: (_) => ApplicationProvider(appRepo)),
+        ChangeNotifierProvider(create: (_) => InspectionProvider(inspRepo)),
+        ChangeNotifierProvider(create: (_) => NotificationProvider(notifRepo)),
         Provider(create: (_) => WebSocketService()),
         ChangeNotifierProvider(
           create: (ctx) => DeviceProvider(
@@ -93,7 +118,7 @@ class LmoApp extends StatelessWidget {
         Provider(create: (_) => LocationService()),
 
         // ── Vendor provider ──
-        ChangeNotifierProvider(create: (_) => VendorProvider(MockVendorRepository())),
+        ChangeNotifierProvider(create: (_) => VendorProvider(vendorRepo)),
       ],
       child: const _CalisAppRouter(),
     );
