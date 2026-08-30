@@ -17,6 +17,7 @@ import 'providers/vendor_provider.dart';
 
 // Repositories
 import 'data/repositories/mock_certificate_repository.dart';
+import 'data/repositories/i_vendor_repository.dart';
 
 // Services
 import 'services/api_client.dart';
@@ -111,6 +112,7 @@ class LmoApp extends StatelessWidget {
         ),
         Provider<ICertificateService>(create: (_) => MockCertificateService(MockCertificateRepository())),
         Provider(create: (_) => LocationService()),
+        Provider<IVendorRepository>.value(value: vendorRepo),
 
         // ── Vendor provider ──
         ChangeNotifierProvider(create: (_) => VendorProvider(vendorRepo)),
