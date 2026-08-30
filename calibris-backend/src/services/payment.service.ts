@@ -86,5 +86,21 @@ export async function verifyMockCallback(params: {
     `Mock payment ${params.transactionRef} verified`
   );
 
+  // Auto-assign an LMO so the application reaches an officer's queue
+  // immediately, without requiring a separate admin action.
+  const lmo = await prisma.lMO.findFirst({ orderBy: { createdAt: "asc" } });
+  if (lmo) {
+    await prisma.application.update({
+      where: { id: payment.applicationId },
+      data: { assignedLmoId: lmo.id },
+    });
+    await transitionApplication(
+      payment.applicationId,
+      "LMO_ASSIGNED",
+      { type: "SYSTEM" },
+      `Auto-assigned to LMO ${lmo.fullName}`
+    );
+  }
+
   return { success: true, applicationId: payment.applicationId };
 }
