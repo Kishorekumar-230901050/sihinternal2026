@@ -96,10 +96,14 @@ class _RegisterInstrumentScreenState extends State<RegisterInstrumentScreen> {
                 ),
               ),
               const SizedBox(height: 16),
-              QrImageView(
-                data: 'https://calibris.gov.in/inst/$uniqueId',
-                version: QrVersions.auto,
-                size: 130,
+              SizedBox(
+                width: 130,
+                height: 130,
+                child: QrImageView(
+                  data: 'https://calibris.gov.in/inst/$uniqueId',
+                  version: QrVersions.auto,
+                  size: 130,
+                ),
               ),
               const SizedBox(height: 8),
               Text('Serial No: ${instrument.serialNumber}', style: const TextStyle(fontSize: 11, color: AppColors.textHint)),
