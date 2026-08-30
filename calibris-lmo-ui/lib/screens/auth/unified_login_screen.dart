@@ -16,6 +16,8 @@ class UnifiedLoginScreen extends StatefulWidget {
 
 class _UnifiedLoginScreenState extends State<UnifiedLoginScreen> with SingleTickerProviderStateMixin {
   late TabController _tabController;
+  final _registerFormKey = GlobalKey<FormState>();
+  final _loginFormKey = GlobalKey<FormState>();
   final _idController = TextEditingController();
   final _passwordController = TextEditingController();
   bool _obscurePassword = true;
@@ -50,6 +52,7 @@ class _UnifiedLoginScreenState extends State<UnifiedLoginScreen> with SingleTick
   }
 
   Future<void> _handleLogin() async {
+    if (!_loginFormKey.currentState!.validate()) return;
     final role = _tabController.index == 0 ? UserRole.lmo : UserRole.vendor;
     final auth = context.read<AuthProvider>();
     final success = await auth.login(role, _idController.text.trim(), _passwordController.text);
@@ -72,6 +75,7 @@ class _UnifiedLoginScreenState extends State<UnifiedLoginScreen> with SingleTick
   }
 
   Future<void> _handleRegister() async {
+    if (!_registerFormKey.currentState!.validate()) return;
     final auth = context.read<AuthProvider>();
     final success = await auth.registerVendor(
       fullName: _regNameController.text.trim(),
@@ -160,7 +164,10 @@ class _UnifiedLoginScreenState extends State<UnifiedLoginScreen> with SingleTick
                 child: Padding(
                   padding: const EdgeInsets.all(20),
                   child: _tabController.index == 2
-                      ? Column(
+                      ? Form(
+                          key: _registerFormKey,
+                          autovalidateMode: AutovalidateMode.onUserInteraction,
+                          child: Column(
                           crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
                             const Text('Vendor / Applicant Registration',
@@ -172,34 +179,48 @@ class _UnifiedLoginScreenState extends State<UnifiedLoginScreen> with SingleTick
                             TextFormField(
                               controller: _regNameController,
                               decoration: const InputDecoration(labelText: 'Full Name', prefixIcon: Icon(Icons.person)),
+                              validator: (v) => (v == null || v.trim().length < 2) ? 'Enter your full name' : null,
                             ),
                             const SizedBox(height: 12),
                             TextFormField(
                               controller: _regEmailController,
                               keyboardType: TextInputType.emailAddress,
                               decoration: const InputDecoration(labelText: 'Email', prefixIcon: Icon(Icons.email)),
+                              validator: (v) => (v == null || !v.contains('@') || !v.contains('.'))
+                                  ? 'Enter a valid email address'
+                                  : null,
                             ),
                             const SizedBox(height: 12),
                             TextFormField(
                               controller: _regPasswordController,
                               obscureText: true,
-                              decoration: const InputDecoration(labelText: 'Password', prefixIcon: Icon(Icons.lock)),
+                              decoration: const InputDecoration(
+                                labelText: 'Password',
+                                prefixIcon: Icon(Icons.lock),
+                                helperText: 'Minimum 8 characters',
+                              ),
+                              validator: (v) => (v == null || v.length < 8) ? 'Password must be at least 8 characters' : null,
                             ),
                             const SizedBox(height: 12),
                             TextFormField(
                               controller: _regPhoneController,
                               keyboardType: TextInputType.phone,
-                              decoration: const InputDecoration(labelText: 'Mobile Number', prefixIcon: Icon(Icons.phone_android)),
+                              decoration: const InputDecoration(
+                                labelText: 'Mobile Number',
+                                prefixIcon: Icon(Icons.phone_android),
+                                helperText: 'Minimum 8 digits',
+                              ),
+                              validator: (v) => (v == null || v.trim().length < 8) ? 'Enter a valid mobile number' : null,
                             ),
                             const SizedBox(height: 12),
                             TextFormField(
                               controller: _regBusinessController,
-                              decoration: const InputDecoration(labelText: 'Business / Establishment Name', prefixIcon: Icon(Icons.storefront)),
+                              decoration: const InputDecoration(labelText: 'Business / Establishment Name (optional)', prefixIcon: Icon(Icons.storefront)),
                             ),
                             const SizedBox(height: 12),
                             TextFormField(
                               controller: _regDistrictController,
-                              decoration: const InputDecoration(labelText: 'City', prefixIcon: Icon(Icons.location_on)),
+                              decoration: const InputDecoration(labelText: 'City (optional)', prefixIcon: Icon(Icons.location_on)),
                             ),
                             const SizedBox(height: 20),
                             SizedBox(
@@ -213,8 +234,12 @@ class _UnifiedLoginScreenState extends State<UnifiedLoginScreen> with SingleTick
                               ),
                             ),
                           ],
+                          ),
                         )
-                      : Column(
+                      : Form(
+                          key: _loginFormKey,
+                          autovalidateMode: AutovalidateMode.onUserInteraction,
+                          child: Column(
                           crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
                             Text(
@@ -231,6 +256,7 @@ class _UnifiedLoginScreenState extends State<UnifiedLoginScreen> with SingleTick
                               controller: _idController,
                               keyboardType: TextInputType.emailAddress,
                               decoration: const InputDecoration(labelText: 'Email', prefixIcon: Icon(Icons.badge)),
+                              validator: (v) => (v == null || v.trim().isEmpty) ? 'Email is required' : null,
                             ),
                             const SizedBox(height: 14),
                             TextFormField(
@@ -244,6 +270,7 @@ class _UnifiedLoginScreenState extends State<UnifiedLoginScreen> with SingleTick
                                   onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
                                 ),
                               ),
+                              validator: (v) => (v == null || v.isEmpty) ? 'Password is required' : null,
                             ),
                             const SizedBox(height: 20),
                             SizedBox(
@@ -256,6 +283,7 @@ class _UnifiedLoginScreenState extends State<UnifiedLoginScreen> with SingleTick
                               ),
                             ),
                           ],
+                          ),
                         ),
                 ),
               ),
