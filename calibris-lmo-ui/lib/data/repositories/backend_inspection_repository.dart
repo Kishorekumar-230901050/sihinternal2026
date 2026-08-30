@@ -112,12 +112,13 @@ class BackendInspectionRepository implements IInspectionRepository {
     if (insp == null) throw Exception('Inspection not found');
 
     final measurement = insp.measurements.isNotEmpty ? insp.measurements.first : null;
+    final remarks = insp.observations ?? insp.failureReason;
 
     final response = await apiClient.post<Map<String, dynamic>>(
       ApiConfig.lmoInspectionResult(insp.applicationId),
       body: {
         'status': insp.result == InspectionResult.pass ? 'PASSED' : 'FAILED',
-        'remarks': insp.observations ?? insp.failureReason,
+        if (remarks != null) 'remarks': remarks,
         if (measurement != null) 'observedValue': measurement.actual,
         if (measurement != null) 'standardValue': measurement.expected,
         if (measurement != null) 'permissibleError': measurement.tolerance,

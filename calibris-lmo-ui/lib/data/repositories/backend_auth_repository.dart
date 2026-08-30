@@ -82,11 +82,11 @@ class BackendAuthRepository implements IAuthRepository {
         'email': email,
         'phone': phone,
         'password': password,
-        'businessName': businessName,
-        'addressLine': addressLine,
-        'city': city,
-        'state': state,
-        'pincode': pincode,
+        if (businessName != null) 'businessName': businessName,
+        if (addressLine != null) 'addressLine': addressLine,
+        if (city != null) 'city': city,
+        if (state != null) 'state': state,
+        if (pincode != null) 'pincode': pincode,
       },
     );
 
