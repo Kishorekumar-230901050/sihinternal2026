@@ -8,12 +8,14 @@ import {
   addDiscrepancy,
   uploadInspectionPhoto,
   submitResult,
+  lmoDashboard,
 } from "../controllers/inspection.controller";
 import { getApplication } from "../controllers/application.controller";
 
 const router = Router();
 router.use(requireAuth, requireRole("LMO"));
 
+router.get("/dashboard", asyncHandler(lmoDashboard));
 router.get("/queue", asyncHandler(myQueue));
 router.get("/applications/:id", asyncHandler(getApplication));
 router.post("/applications/:applicationId/inspection/start", asyncHandler(startInspection));

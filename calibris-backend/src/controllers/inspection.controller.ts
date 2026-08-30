@@ -4,6 +4,31 @@ import { prisma } from "../db";
 import { transitionApplication } from "../services/status.service";
 import { uploadFile } from "../services/storage.service";
 
+/** LMO dashboard: assigned/pending/completed counts + today's inspections. */
+export async function lmoDashboard(req: Request, res: Response) {
+  const lmoId = req.auth!.sub;
+
+  const todayStart = new Date();
+  todayStart.setHours(0, 0, 0, 0);
+  const todayEnd = new Date();
+  todayEnd.setHours(23, 59, 59, 999);
+
+  const [assigned, pending, completed, todaysInspections] = await Promise.all([
+    prisma.application.count({ where: { assignedLmoId: lmoId } }),
+    prisma.application.count({
+      where: { assignedLmoId: lmoId, status: { in: ["LMO_ASSIGNED", "INSPECTION_IN_PROGRESS"] } },
+    }),
+    prisma.application.count({
+      where: { assignedLmoId: lmoId, status: { in: ["PASSED", "FAILED", "CERTIFICATE_ISSUED", "INSPECTION_COMPLETE"] } },
+    }),
+    prisma.inspection.count({
+      where: { lmoId, startedAt: { gte: todayStart, lte: todayEnd } },
+    }),
+  ]);
+
+  res.json({ assigned, pending, completed, todaysInspections });
+}
+
 /** Applications assigned to the logged-in LMO that are ready for inspection. */
 export async function myQueue(req: Request, res: Response) {
   const lmoId = req.auth!.sub;
@@ -115,6 +140,9 @@ export async function uploadInspectionPhoto(req: Request, res: Response) {
 const submitResultSchema = z.object({
   status: z.enum(["PASSED", "FAILED"]),
   remarks: z.string().optional(),
+  observedValue: z.number().optional(),
+  standardValue: z.number().optional(),
+  permissibleError: z.number().optional(),
 });
 
 export async function submitResult(req: Request, res: Response) {
@@ -127,12 +155,17 @@ export async function submitResult(req: Request, res: Response) {
   const parsed = submitResultSchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
 
+  const { observedValue, standardValue, permissibleError, status, remarks } = parsed.data;
+  const errorValue =
+    observedValue !== undefined && standardValue !== undefined ? observedValue - standardValue : undefined;
+
   const result = await prisma.$transaction(async (tx) => {
     await tx.inspection.update({ where: { id: inspection.id }, data: { completedAt: new Date() } });
+    const data = { status, remarks, observedValue, standardValue, permissibleError, errorValue };
     const r = await tx.inspectionResult.upsert({
       where: { inspectionId: inspection.id },
-      create: { inspectionId: inspection.id, status: parsed.data.status, remarks: parsed.data.remarks },
-      update: { status: parsed.data.status, remarks: parsed.data.remarks },
+      create: { inspectionId: inspection.id, ...data },
+      update: data,
     });
     return r;
   });

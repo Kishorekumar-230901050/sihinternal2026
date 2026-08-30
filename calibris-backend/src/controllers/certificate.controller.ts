@@ -1,5 +1,6 @@
 import { Request, Response } from "express";
 import { prisma } from "../db";
+import { classifyExpiry } from "../utils/expiry";
 
 /**
  * Public endpoint reached by scanning the certificate QR code. Intentionally
@@ -21,11 +22,9 @@ export async function verifyPublic(req: Request, res: Response) {
 
   if (!certificate) return res.status(404).json({ error: "Certificate not found" });
 
-  const isValid = certificate.validUntil > new Date();
-
   res.json({
     certificateNo: certificate.certificateNo,
-    status: isValid ? "VALID" : "EXPIRED",
+    status: classifyExpiry(certificate.validUntil),
     issuedAt: certificate.issuedAt,
     validUntil: certificate.validUntil,
     instrumentType: certificate.application.instrument.instrumentType.name,

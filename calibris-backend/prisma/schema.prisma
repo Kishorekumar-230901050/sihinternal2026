@@ -327,12 +327,16 @@ model Inspection {
 }
 
 model InspectionResult {
-  id           String                  @id @default(cuid())
-  inspectionId String                  @unique
-  inspection   Inspection              @relation(fields: [inspectionId], references: [id], onDelete: Cascade)
-  status       InspectionResultStatus
-  remarks      String?
-  createdAt    DateTime                @default(now())
+  id               String                 @id @default(cuid())
+  inspectionId     String                 @unique
+  inspection       Inspection             @relation(fields: [inspectionId], references: [id], onDelete: Cascade)
+  observedValue    Float?
+  standardValue    Float?
+  errorValue       Float? // observedValue - standardValue
+  permissibleError Float?
+  status           InspectionResultStatus
+  remarks          String?
+  createdAt        DateTime               @default(now())
 
   @@map("inspection_results")
 }

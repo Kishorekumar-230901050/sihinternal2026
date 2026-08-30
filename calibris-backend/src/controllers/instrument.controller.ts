@@ -1,6 +1,7 @@
 import { Request, Response } from "express";
 import { z } from "zod";
 import { prisma } from "../db";
+import { classifyExpiry } from "../utils/expiry";
 
 export async function listInstrumentTypes(_req: Request, res: Response) {
   let types = await prisma.instrumentType.findMany({ orderBy: { name: "asc" } });
@@ -138,4 +139,52 @@ export async function listMyInstruments(req: Request, res: Response) {
     orderBy: { createdAt: "desc" },
   });
   res.json(instruments);
+}
+
+/** Owner dashboard: instrument counts, application pipeline, expiry summary. */
+export async function vendorDashboard(req: Request, res: Response) {
+  const vendorId = req.auth!.sub;
+
+  const [instrumentCount, applications] = await Promise.all([
+    prisma.instrument.count({ where: { vendorId } }),
+    prisma.application.findMany({
+      where: { vendorId },
+      select: { status: true, certificate: { select: { validUntil: true } } },
+    }),
+  ]);
+
+  const pendingStatuses = new Set([
+    "SUBMITTED",
+    "DOCUMENTS_PENDING",
+    "DOCUMENTS_VERIFIED",
+    "SLOT_BOOKED",
+    "PAYMENT_PENDING",
+    "PAYMENT_COMPLETE",
+    "LMO_ASSIGNED",
+    "INSPECTION_IN_PROGRESS",
+    "INSPECTION_COMPLETE",
+  ]);
+
+  let pendingApplications = 0;
+  let verified = 0;
+  let expiringSoon = 0;
+  let expired = 0;
+
+  for (const app of applications) {
+    if (pendingStatuses.has(app.status)) pendingApplications++;
+    if (app.status === "CERTIFICATE_ISSUED" && app.certificate) {
+      verified++;
+      const status = classifyExpiry(app.certificate.validUntil);
+      if (status === "EXPIRING_SOON") expiringSoon++;
+      if (status === "EXPIRED") expired++;
+    }
+  }
+
+  res.json({
+    myInstruments: instrumentCount,
+    pendingApplications,
+    verified,
+    expiringSoon,
+    expired,
+  });
 }

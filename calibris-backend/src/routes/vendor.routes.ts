@@ -2,7 +2,7 @@ import { Router } from "express";
 import { asyncHandler } from "../utils/asyncHandler";
 import { requireAuth, requireRole } from "../middlewares/auth";
 import { upload } from "../middlewares/upload";
-import { listInstrumentTypes, registerInstrument, listMyInstruments } from "../controllers/instrument.controller";
+import { listInstrumentTypes, registerInstrument, listMyInstruments, vendorDashboard } from "../controllers/instrument.controller";
 import { createApplication, uploadDocument, getApplication, listMyApplications, cancelApplication } from "../controllers/application.controller";
 import { findGatcs, getGatc } from "../controllers/gatc.controller";
 import { bookAppointment, gatcAvailability } from "../controllers/appointment.controller";
@@ -11,6 +11,8 @@ import { getMyCertificate } from "../controllers/certificate.controller";
 
 const router = Router();
 router.use(requireAuth, requireRole("VENDOR"));
+
+router.get("/dashboard", asyncHandler(vendorDashboard));
 
 // Instruments
 router.get("/instrument-types", asyncHandler(listInstrumentTypes));
