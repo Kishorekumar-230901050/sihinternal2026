@@ -1,0 +1,33 @@
+# Flutter / Dart
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+build/
+*.ephemeral
+
+# Node / JS
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Android / iOS / Windows
+android/.gradle
+android/captures/
+android/gradlew
+android/gradlew.bat
+android/local.properties
+GeneratedPluginRegistrant.java
+ios/.symlinks/
+ios/Pods/
+ios/Podfile.lock
+windows/flutter/ephemeral/
+
+# IDE / OS
+.idea/
+.vscode/
+*.swp
+*.lock
+.DS_Store
+Thumbs.db

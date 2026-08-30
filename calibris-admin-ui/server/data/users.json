@@ -1,0 +1,29 @@
+[
+  {
+    "id": "admin-1",
+    "firstName": "Kaviya",
+    "lastName": "Madhiraju",
+    "email": "11kaviya11@gmail.com",
+    "passwordHash": "$2b$10$rM/KvwBcvNNASmGChUQvDufoDnudbpCeQMsEbC6W2PBOzxzaH3Ir2",
+    "role": "admin",
+    "createdAt": "2025-12-04T15:37:20.771Z"
+  },
+  {
+    "id": "vLnPjlVC93f1kOIdMhNAikBJzCz1",
+    "firstName": "poovannan",
+    "lastName": "",
+    "email": "poovannan@lmd.com",
+    "passwordHash": "",
+    "role": "officer",
+    "createdAt": "2025-12-09T02:05:02.204Z"
+  },
+  {
+    "id": "lfYwgbWeOUgQxXVzFIA2PRCA6mm1",
+    "firstName": "Admin",
+    "lastName": "",
+    "email": "admin@lmd.com",
+    "passwordHash": "",
+    "role": "admin",
+    "createdAt": "2025-12-09T02:05:47.873Z"
+  }
+]

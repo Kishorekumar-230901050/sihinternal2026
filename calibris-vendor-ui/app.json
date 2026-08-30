@@ -1,0 +1,34 @@
+{
+  "expo": {
+    "name": "Calibris",
+    "slug": "calibris-user-app",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "backgroundColor": "#0F6E5D"
+    },
+    "assetBundlePatterns": ["**/*"],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.calibris.userapp"
+    },
+    "android": {
+      "package": "com.calibris.userapp",
+      "adaptiveIcon": {
+        "backgroundColor": "#0F6E5D"
+      }
+    },
+    "web": {
+      "bundler": "metro"
+    },
+    "plugins": [
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "Calibris uses your location to find the nearest Government Approved Test Centres."
+        }
+      ]
+    ]
+  }
+}

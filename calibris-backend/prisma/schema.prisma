@@ -1,0 +1,466 @@
+// CALIBRIS - Legal Metrology Verification Platform
+// Prisma 7 schema. Connection details are supplied via prisma.config.ts + .env
+// (DATABASE_URL = pooled :6543, DIRECT_URL = direct :5432 for migrations).
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+// Prisma 7: connection URLs no longer live here. They're configured in
+// prisma.config.ts (used by the CLI for migrations) and passed directly to
+// the driver adapter in src/db.ts (used by the app at runtime).
+datasource db {
+  provider = "postgresql"
+}
+
+// ---------------------------------------------------------------------------
+// Enums
+// ---------------------------------------------------------------------------
+
+enum UserRole {
+  VENDOR
+  LMO
+  ADMIN
+}
+
+enum ApplicationStatus {
+  SUBMITTED
+  DOCUMENTS_PENDING
+  DOCUMENTS_VERIFIED
+  SLOT_BOOKED
+  PAYMENT_PENDING
+  PAYMENT_COMPLETE
+  LMO_ASSIGNED
+  INSPECTION_IN_PROGRESS
+  INSPECTION_COMPLETE
+  PASSED
+  FAILED
+  CERTIFICATE_ISSUED
+  REJECTED
+  CANCELLED
+}
+
+enum PaymentStatus {
+  PENDING
+  SUCCESS
+  FAILED
+  REFUNDED
+}
+
+enum InspectionResultStatus {
+  PASSED
+  FAILED
+}
+
+enum DocumentType {
+  INSTRUMENT_PHOTO
+  SUPPORTING_DOCUMENT
+  ID_PROOF
+  OTHER
+}
+
+enum NotificationChannel {
+  IN_APP
+  EMAIL
+  SMS
+}
+
+// ---------------------------------------------------------------------------
+// Identity
+// ---------------------------------------------------------------------------
+
+model User {
+  id            String   @id @default(cuid())
+  role          UserRole @default(VENDOR)
+  fullName      String
+  email         String   @unique
+  phone         String   @unique
+  passwordHash  String
+  businessName  String?
+  addressLine   String?
+  city          String?
+  state         String?
+  pincode       String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  instruments   Instrument[]
+  applications  Application[]
+  notifications Notification[]
+
+  @@map("users")
+}
+
+model LMO {
+  id             String   @id @default(cuid())
+  fullName       String
+  email          String   @unique
+  phone          String   @unique
+  passwordHash   String
+  employeeCode   String   @unique
+  departmentId   String?
+  department     Department? @relation(fields: [departmentId], references: [id])
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  locations      LMOLocation[]
+  inspections    Inspection[]
+  applications   Application[] @relation("AssignedLMO")
+
+  @@map("lmos")
+}
+
+model Admin {
+  id           String   @id @default(cuid())
+  fullName     String
+  email        String   @unique
+  passwordHash String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  auditLogs    AuditLog[]
+
+  @@map("admins")
+}
+
+// ---------------------------------------------------------------------------
+// Jurisdiction
+// ---------------------------------------------------------------------------
+
+model Department {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  createdAt DateTime @default(now())
+
+  lmos      LMO[]
+  locations Location[]
+
+  @@map("departments")
+}
+
+model Location {
+  id           String   @id @default(cuid())
+  name         String
+  district     String
+  state        String
+  pincode      String
+  departmentId String?
+  department   Department? @relation(fields: [departmentId], references: [id])
+  createdAt    DateTime @default(now())
+
+  lmoLocations LMOLocation[]
+  gatcs        GATC[]
+
+  @@map("locations")
+}
+
+model LMOLocation {
+  id         String   @id @default(cuid())
+  lmoId      String
+  locationId String
+  lmo        LMO      @relation(fields: [lmoId], references: [id], onDelete: Cascade)
+  location   Location @relation(fields: [locationId], references: [id], onDelete: Cascade)
+
+  @@unique([lmoId, locationId])
+  @@map("lmo_locations")
+}
+
+// ---------------------------------------------------------------------------
+// Test Centres (GATC = Government Approved Test Centre)
+// ---------------------------------------------------------------------------
+
+model GATC {
+  id            String   @id @default(cuid())
+  name          String
+  addressLine   String
+  latitude      Float
+  longitude     Float
+  locationId    String
+  location      Location @relation(fields: [locationId], references: [id])
+  contactPhone  String?
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  instrumentTypes GATCInstrumentType[]
+  appointments    Appointment[]
+  applications    Application[]
+
+  @@map("gatcs")
+}
+
+model GATCInstrumentType {
+  id               String   @id @default(cuid())
+  gatcId           String
+  instrumentTypeId String
+  dailyCapacity    Int      @default(20)
+  gatc             GATC           @relation(fields: [gatcId], references: [id], onDelete: Cascade)
+  instrumentType   InstrumentType @relation(fields: [instrumentTypeId], references: [id], onDelete: Cascade)
+
+  @@unique([gatcId, instrumentTypeId])
+  @@map("gatc_instrument_types")
+}
+
+// ---------------------------------------------------------------------------
+// Instruments
+// ---------------------------------------------------------------------------
+
+model InstrumentType {
+  id             String   @id @default(cuid())
+  name           String   @unique
+  code           String   @unique
+  category       String?
+  description    String?
+  feeInPaise     Int      @default(50000)
+  validityMonths Int      @default(12)
+  createdAt      DateTime @default(now())
+
+  instruments      Instrument[]
+  gatcMappings     GATCInstrumentType[]
+
+  @@map("instrument_types")
+}
+
+model Instrument {
+  id               String   @id @default(cuid())
+  vendorId         String
+  vendor           User     @relation(fields: [vendorId], references: [id])
+  instrumentTypeId String
+  instrumentType   InstrumentType @relation(fields: [instrumentTypeId], references: [id])
+  serialNumber     String
+  manufacturer     String?
+  model            String?
+  capacity         String?
+  yearOfMake       Int?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  applications     Application[]
+
+  @@unique([instrumentTypeId, serialNumber])
+  @@map("instruments")
+}
+
+// ---------------------------------------------------------------------------
+// Applications / Lifecycle
+// ---------------------------------------------------------------------------
+
+model Application {
+  id            String            @id @default(cuid())
+  vendorId      String
+  vendor        User              @relation(fields: [vendorId], references: [id])
+  instrumentId  String
+  instrument    Instrument        @relation(fields: [instrumentId], references: [id])
+  gatcId        String?
+  gatc          GATC?             @relation(fields: [gatcId], references: [id])
+  assignedLmoId String?
+  assignedLmo   LMO?              @relation("AssignedLMO", fields: [assignedLmoId], references: [id])
+  status        ApplicationStatus @default(SUBMITTED)
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+
+  statusHistory ApplicationStatusHistory[]
+  documents     Document[]
+  photographs   Photograph[]
+  appointment   Appointment?
+  payments      Payment[]
+  inspection    Inspection?
+  certificate   Certificate?
+  notifications Notification[]
+
+  @@map("applications")
+}
+
+model ApplicationStatusHistory {
+  id            String            @id @default(cuid())
+  applicationId String
+  application   Application       @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  fromStatus    ApplicationStatus?
+  toStatus      ApplicationStatus
+  changedByType String            // "USER" | "LMO" | "ADMIN" | "SYSTEM"
+  changedById   String?
+  note          String?
+  createdAt     DateTime          @default(now())
+
+  @@map("application_status_history")
+}
+
+// ---------------------------------------------------------------------------
+// Appointments
+// ---------------------------------------------------------------------------
+
+model Appointment {
+  id            String   @id @default(cuid())
+  applicationId String   @unique
+  application   Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  gatcId        String
+  gatc          GATC     @relation(fields: [gatcId], references: [id])
+  slotDate      DateTime // date component used for capacity bucketing
+  slotStart     DateTime
+  slotEnd       DateTime
+  createdAt     DateTime @default(now())
+
+  @@map("appointments")
+}
+
+// ---------------------------------------------------------------------------
+// Inspection
+// ---------------------------------------------------------------------------
+
+model Inspection {
+  id            String   @id @default(cuid())
+  applicationId String   @unique
+  application   Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  lmoId         String
+  lmo           LMO      @relation(fields: [lmoId], references: [id])
+  startedAt     DateTime?
+  completedAt   DateTime?
+  gpsLatitude   Float?
+  gpsLongitude  Float?
+  notes         String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  result        InspectionResult?
+  discrepancies Discrepancy[]
+
+  @@map("inspections")
+}
+
+model InspectionResult {
+  id           String                  @id @default(cuid())
+  inspectionId String                  @unique
+  inspection   Inspection              @relation(fields: [inspectionId], references: [id], onDelete: Cascade)
+  status       InspectionResultStatus
+  remarks      String?
+  createdAt    DateTime                @default(now())
+
+  @@map("inspection_results")
+}
+
+model Discrepancy {
+  id           String   @id @default(cuid())
+  inspectionId String
+  inspection   Inspection @relation(fields: [inspectionId], references: [id], onDelete: Cascade)
+  description  String
+  severity     String   @default("MINOR") // MINOR | MAJOR | CRITICAL
+  photoUrl     String?
+  createdAt    DateTime @default(now())
+
+  @@map("discrepancies")
+}
+
+// ---------------------------------------------------------------------------
+// Payments
+// ---------------------------------------------------------------------------
+
+model Payment {
+  id             String        @id @default(cuid())
+  applicationId  String
+  application    Application   @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  amountInPaise  Int
+  status         PaymentStatus @default(PENDING)
+  provider       String        @default("MOCK_RAZORPAY")
+  orderRef       String        @unique
+  transactionRef String?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  @@map("payments")
+}
+
+// ---------------------------------------------------------------------------
+// Certificates
+// ---------------------------------------------------------------------------
+
+model Certificate {
+  id             String   @id @default(cuid())
+  applicationId  String   @unique
+  application    Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  certificateNo  String   @unique
+  qrToken        String   @unique @default(cuid())
+  issuedAt       DateTime @default(now())
+  validUntil     DateTime
+  pdfUrl         String?
+  createdAt      DateTime @default(now())
+
+  versions       CertificateVersion[]
+
+  @@map("certificates")
+}
+
+model CertificateVersion {
+  id            String      @id @default(cuid())
+  certificateId String
+  certificate   Certificate @relation(fields: [certificateId], references: [id], onDelete: Cascade)
+  versionNumber Int
+  snapshotJson  Json
+  pdfUrl        String?
+  createdAt     DateTime    @default(now())
+
+  @@unique([certificateId, versionNumber])
+  @@map("certificate_versions")
+}
+
+// ---------------------------------------------------------------------------
+// Files
+// ---------------------------------------------------------------------------
+
+model Document {
+  id            String       @id @default(cuid())
+  applicationId String
+  application   Application  @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  type          DocumentType
+  url           String
+  originalName  String
+  mimeType      String
+  sizeBytes     Int
+  createdAt     DateTime     @default(now())
+
+  @@map("documents")
+}
+
+model Photograph {
+  id            String      @id @default(cuid())
+  applicationId String
+  application   Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  url           String
+  caption       String?
+  takenByType   String      // "VENDOR" | "LMO"
+  gpsLatitude   Float?
+  gpsLongitude  Float?
+  createdAt     DateTime    @default(now())
+
+  @@map("photographs")
+}
+
+// ---------------------------------------------------------------------------
+// Notifications & Audit
+// ---------------------------------------------------------------------------
+
+model Notification {
+  id            String              @id @default(cuid())
+  userId        String
+  user          User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  applicationId String?
+  application   Application?        @relation(fields: [applicationId], references: [id])
+  channel       NotificationChannel @default(IN_APP)
+  title         String
+  body          String
+  isRead        Boolean             @default(false)
+  createdAt     DateTime            @default(now())
+
+  @@map("notifications")
+}
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  adminId    String?
+  admin      Admin?   @relation(fields: [adminId], references: [id])
+  action     String
+  entityType String
+  entityId   String
+  metaJson   Json?
+  createdAt  DateTime @default(now())
+
+  @@map("audit_logs")
+}
