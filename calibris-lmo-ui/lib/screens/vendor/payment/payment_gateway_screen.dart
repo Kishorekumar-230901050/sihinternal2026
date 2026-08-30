@@ -70,12 +70,12 @@ class _PaymentGatewayScreenState extends State<PaymentGatewayScreen> {
             Text('Select Payment Method', style: Theme.of(context).textTheme.titleMedium),
             const SizedBox(height: 12),
 
-            ...[
-              ('UPI', Icons.account_balance_wallet, 'UPI / Google Pay / PhonePe'),
-              ('NetBanking', Icons.account_balance, 'Net Banking'),
-              ('Card', Icons.credit_card, 'Debit / Credit Card'),
+            ...const [
+              _PaymentOption(id: 'UPI', icon: Icons.account_balance_wallet, title: 'UPI / Google Pay / PhonePe'),
+              _PaymentOption(id: 'NetBanking', icon: Icons.account_balance, title: 'Net Banking'),
+              _PaymentOption(id: 'Card', icon: Icons.credit_card, title: 'Debit / Credit Card'),
             ].map((m) {
-              final isSelected = _selectedMethod == m.$1;
+              final isSelected = _selectedMethod == m.id;
               return Card(
                 margin: const EdgeInsets.only(bottom: 8),
                 shape: RoundedRectangleBorder(
@@ -83,15 +83,15 @@ class _PaymentGatewayScreenState extends State<PaymentGatewayScreen> {
                   side: BorderSide(color: isSelected ? AppColors.vendorAccent : AppColors.border, width: isSelected ? 2 : 1),
                 ),
                 child: ListTile(
-                  leading: Icon(m.$2, color: isSelected ? AppColors.vendorAccent : AppColors.textSecondary),
-                  title: Text(m.$3),
+                  leading: Icon(m.icon, color: isSelected ? AppColors.vendorAccent : AppColors.textSecondary),
+                  title: Text(m.title),
                   trailing: Radio<String>(
-                    value: m.$1,
+                    value: m.id,
                     groupValue: _selectedMethod,
                     onChanged: (v) => setState(() => _selectedMethod = v!),
                     activeColor: AppColors.vendorAccent,
                   ),
-                  onTap: () => setState(() => _selectedMethod = m.$1),
+                  onTap: () => setState(() => _selectedMethod = m.id),
                 ),
               );
             }),
@@ -130,3 +130,16 @@ class _PaymentGatewayScreenState extends State<PaymentGatewayScreen> {
     );
   }
 }
+
+class _PaymentOption {
+  final String id;
+  final IconData icon;
+  final String title;
+
+  const _PaymentOption({
+    required this.id,
+    required this.icon,
+    required this.title,
+  });
+}
+

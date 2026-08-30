@@ -63,7 +63,7 @@ class BackendInspectionRepository implements IInspectionRepository {
 
   @override
   Future<List<InspectionModel>> getInspectionHistoryForInstrument(String instrumentId) async {
-    return MockDataStore.inspections.where((i) => i.instrumentId == instrumentId).toList();
+    return MockDataStore.inspections.toList();
   }
 
   @override

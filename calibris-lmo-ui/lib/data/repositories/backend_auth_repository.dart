@@ -18,7 +18,7 @@ class BackendAuthRepository implements IAuthRepository {
   });
 
   @override
-  Future<(UserModel, String)> login(String identifier, String password) async {
+  Future<AuthResult> login(String identifier, String password) async {
     // Determine whether this identifier is an LMO employee ID/email or Vendor email
     final isLmo = identifier.toUpperCase().startsWith('LMO') ||
         identifier.toUpperCase().startsWith('USR') ||
@@ -47,9 +47,9 @@ class BackendAuthRepository implements IAuthRepository {
           employeeId: lmoData['employeeCode']?.toString() ?? identifier,
           name: lmoData['fullName']?.toString() ?? 'Officer Rajesh Kumar',
           email: lmoData['email']?.toString() ?? identifier,
-          designation: 'Legal Metrology Officer',
-          department: 'Weights & Measures Dept.',
-          zone: 'Zone 4 - Western Mumbai',
+          district: 'Mumbai',
+          city: 'Mumbai',
+          state: 'Maharashtra',
           role: UserRole.lmo,
         );
       } else {
@@ -59,9 +59,11 @@ class BackendAuthRepository implements IAuthRepository {
           employeeId: 'VND-001',
           name: userData['fullName']?.toString() ?? 'Arjun Mehta',
           email: userData['email']?.toString() ?? identifier,
-          designation: 'Authorized Vendor',
-          department: userData['businessName']?.toString() ?? 'Precision Scales & Calibration',
-          zone: userData['city']?.toString() ?? 'Mumbai Central',
+          district: userData['city']?.toString() ?? 'Mumbai',
+          businessName: userData['businessName']?.toString() ?? 'Precision Scales & Calibration',
+          city: userData['city']?.toString() ?? 'Mumbai',
+          state: userData['state']?.toString() ?? 'Maharashtra',
+          pincode: userData['pincode']?.toString() ?? '400001',
           role: UserRole.vendor,
         );
       }
@@ -78,7 +80,7 @@ class BackendAuthRepository implements IAuthRepository {
           'role': user.role.name,
         }),
       );
-      return (user, token);
+      return AuthResult(user: user, token: token);
     }
 
     // Graceful fallback to MockDataStore if backend is offline or credentials fail
@@ -95,12 +97,12 @@ class BackendAuthRepository implements IAuthRepository {
         token: _token!,
         role: user.role.name,
       );
-      return (user, _token!);
+      return AuthResult(user: user, token: _token!);
     } catch (_) {
       final defaultUser = MockDataStore.users.first;
       _currentUser = defaultUser;
       _token = 'fallback-token-default';
-      return (defaultUser, _token!);
+      return AuthResult(user: defaultUser, token: _token!);
     }
   }
 
@@ -138,9 +140,12 @@ class BackendAuthRepository implements IAuthRepository {
         employeeId: 'VND-NEW',
         name: fullName,
         email: email,
-        designation: 'Registered Vendor',
-        department: businessName ?? 'Vendor Business',
-        zone: city ?? 'Mumbai',
+        phone: phone,
+        district: city ?? 'Mumbai',
+        businessName: businessName ?? 'Vendor Business',
+        city: city ?? 'Mumbai',
+        state: state ?? 'Maharashtra',
+        pincode: pincode ?? '400001',
         role: UserRole.vendor,
       );
       _currentUser = user;

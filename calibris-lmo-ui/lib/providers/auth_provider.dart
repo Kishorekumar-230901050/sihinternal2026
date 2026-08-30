@@ -26,7 +26,7 @@ class AuthProvider extends ChangeNotifier {
 
     try {
       final result = await _authRepository.login(employeeId, password);
-      _currentUser = result.$1;
+      _currentUser = result.user;
       _auditService.log(_currentUser!.id, AuditAction.login);
       _isLoading = false;
       notifyListeners();

@@ -7,7 +7,7 @@ class MockAuthRepository implements IAuthRepository {
   String? _token;
 
   @override
-  Future<(UserModel, String)> login(String employeeId, String password) async {
+  Future<AuthResult> login(String employeeId, String password) async {
     await Future.delayed(const Duration(milliseconds: 500));
 
     // No validation per requirements — accept any password in demo mode
@@ -15,7 +15,7 @@ class MockAuthRepository implements IAuthRepository {
       final user = MockDataStore.users.firstWhere((u) => u.employeeId == employeeId);
       _currentUser = user;
       _token = 'mock-token-${user.role.name}-12345';
-      return (user, _token!);
+      return AuthResult(user: user, token: _token!);
     } catch (e) {
       throw Exception('User not found');
     }

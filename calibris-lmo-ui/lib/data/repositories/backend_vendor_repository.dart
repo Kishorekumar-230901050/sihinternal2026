@@ -28,7 +28,7 @@ class BackendVendorRepository implements IVendorRepository {
     if (response.success && response.data != null) {
       try {
         final List list = response.data is List ? response.data : (response.data['instruments'] ?? []);
-        final parsed = list.map((item) {
+        final parsed = list.map<InstrumentInfo>((item) {
           final m = item as Map<String, dynamic>;
           return InstrumentInfo(
             instrumentId: m['id']?.toString() ?? 'INST-001',
@@ -42,6 +42,7 @@ class BackendVendorRepository implements IVendorRepository {
             registeredLocationLat: 19.0183,
             registeredLocationLng: 72.8478,
             registeredAddress: m['location']?.toString() ?? 'Mumbai, Maharashtra',
+            isDigitalCompatible: true,
           );
         }).toList();
         if (parsed.isNotEmpty) {
@@ -101,18 +102,18 @@ class BackendVendorRepository implements IVendorRepository {
     if (response.success && response.data != null) {
       try {
         final List list = response.data is List ? response.data : (response.data['gatcs'] ?? []);
-        final parsed = list.map((item) {
+        final parsed = list.map<GatcModel>((item) {
           final m = item as Map<String, dynamic>;
           return GatcModel(
             id: m['id']?.toString() ?? 'GATC-001',
             name: m['name']?.toString() ?? 'Govt Approved Test Centre',
             addressLine: m['addressLine']?.toString() ?? 'Mount Road, Chennai',
+            district: m['district']?.toString() ?? 'Chennai',
+            state: m['state']?.toString() ?? 'Tamil Nadu',
             latitude: (m['latitude'] as num?)?.toDouble() ?? 19.0183,
             longitude: (m['longitude'] as num?)?.toDouble() ?? 72.8478,
+            contactPhone: m['contactPhone']?.toString() ?? '+919000000001',
             distanceKm: 2.5,
-            phone: m['contactPhone']?.toString() ?? '+919000000001',
-            email: m['contactEmail']?.toString() ?? 'gatc@calibris.gov.in',
-            availableSlotsCount: 8,
           );
         }).toList();
         if (parsed.isNotEmpty) return parsed;

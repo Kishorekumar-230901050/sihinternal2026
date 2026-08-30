@@ -10,7 +10,7 @@ class BackendNotificationRepository implements INotificationRepository {
 
   @override
   Future<List<NotificationModel>> getNotificationsForOfficer(String officerId) async {
-    return MockDataStore.notifications.where((n) => n.userId == officerId).toList();
+    return MockDataStore.notifications.where((n) => n.officerId == officerId).toList();
   }
 
   @override
@@ -24,7 +24,7 @@ class BackendNotificationRepository implements INotificationRepository {
   @override
   Future<void> markAllAsRead(String officerId) async {
     for (int i = 0; i < MockDataStore.notifications.length; i++) {
-      if (MockDataStore.notifications[i].userId == officerId) {
+      if (MockDataStore.notifications[i].officerId == officerId) {
         MockDataStore.notifications[i] = MockDataStore.notifications[i].copyWith(isRead: true);
       }
     }
@@ -32,6 +32,6 @@ class BackendNotificationRepository implements INotificationRepository {
 
   @override
   int getUnreadCount(String officerId) {
-    return MockDataStore.notifications.where((n) => n.userId == officerId && !n.isRead).length;
+    return MockDataStore.notifications.where((n) => n.officerId == officerId && !n.isRead).length;
   }
 }
