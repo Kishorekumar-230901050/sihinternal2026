@@ -54,7 +54,10 @@ class _InspectionFormScreenState extends State<InspectionFormScreen> {
 
       final success = await provider.submitInspection(result, failureReason: _failureReasonController.text);
       if (success && mounted) {
-        context.pushReplacementNamed(AppRoutes.verificationSummary, pathParameters: {'id': provider.currentInspection!.id});
+        final targetId = (provider.currentInspection?.id != null && provider.currentInspection!.id.isNotEmpty)
+            ? provider.currentInspection!.id
+            : (widget.applicationId.isNotEmpty ? widget.applicationId : 'INSP-001');
+        context.pushReplacementNamed(AppRoutes.verificationSummary, pathParameters: {'id': targetId});
       }
     }
   }
