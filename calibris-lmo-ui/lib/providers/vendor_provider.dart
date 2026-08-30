@@ -18,6 +18,7 @@ class VendorProvider extends ChangeNotifier {
   List<CertificateModel> _certificates = [];
   bool _isLoading = false;
   String? _errorMessage;
+  PaymentModel? _lastPayment;
 
   // ── Wizard state (multi-step apply flow) ──────────────────────
   InstrumentInfo? _selectedInstrument;
@@ -28,8 +29,6 @@ class VendorProvider extends ChangeNotifier {
   DateTime? _selectedSlotDate;
   String? _selectedSlotTime; // "Morning" or "Afternoon"
   bool _isGpsDetecting = false;
-  double _currentLat = 19.0183;
-  double _currentLng = 72.8478;
   VendorApplicationModel? _currentApplication;
 
   // ── Getters ────────────────────────────────────────────────────
@@ -39,6 +38,7 @@ class VendorProvider extends ChangeNotifier {
   List<CertificateModel> get certificates => _certificates;
   bool get isLoading => _isLoading;
   String? get errorMessage => _errorMessage;
+  PaymentModel? get lastPayment => _lastPayment;
 
   InstrumentInfo? get selectedInstrument => _selectedInstrument;
   bool get isReverification => _isReverification;
@@ -48,8 +48,6 @@ class VendorProvider extends ChangeNotifier {
   DateTime? get selectedSlotDate => _selectedSlotDate;
   String? get selectedSlotTime => _selectedSlotTime;
   bool get isGpsDetecting => _isGpsDetecting;
-  double get currentLat => _currentLat;
-  double get currentLng => _currentLng;
   VendorApplicationModel? get currentApplication => _currentApplication;
 
   // ── Automated Due Date Alerts (30, 7, 2, 1 days) ──────────────
@@ -94,18 +92,12 @@ class VendorProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final results = await Future.wait([
-        _repo.getInstruments(vendorId),
-        _repo.getGatcs(),
-        _repo.getApplications(vendorId),
-        _repo.getCertificates(vendorId),
-      ]);
-      _instruments = results[0] as List<InstrumentInfo>;
-      _gatcs = results[1] as List<GatcModel>;
-      _applications = results[2] as List<VendorApplicationModel>;
-      _certificates = results[3] as List<CertificateModel>;
+      _instruments = await _repo.getInstruments(vendorId);
+      _gatcs = await _repo.getGatcs();
+      _applications = await _repo.getApplications(vendorId);
+      _certificates = await _repo.getCertificates(vendorId);
     } catch (e) {
-      _errorMessage = e.toString();
+      _errorMessage = e.toString().replaceFirst('Exception: ', '');
     }
     _isLoading = false;
     notifyListeners();
@@ -114,7 +106,9 @@ class VendorProvider extends ChangeNotifier {
   // ── Instrument registration ────────────────────────────────────
   Future<void> registerInstrument(InstrumentInfo instrument) async {
     await _repo.registerInstrument(instrument);
-    _instruments.add(instrument);
+    // vendorId is unused by the backend-scoped implementation (the JWT
+    // determines the caller); passed empty since only that impl is wired.
+    _instruments = await _repo.getInstruments('');
     notifyListeners();
   }
 
@@ -150,8 +144,6 @@ class VendorProvider extends ChangeNotifier {
     _isGpsDetecting = true;
     notifyListeners();
     await Future.delayed(const Duration(milliseconds: 900));
-    _currentLat = 19.0183;
-    _currentLng = 72.8478;
     _isGpsDetecting = false;
     notifyListeners();
   }
@@ -179,123 +171,81 @@ class VendorProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Creates the real backend application for the currently selected
+  /// instrument. Called as soon as the instrument step is confirmed so
+  /// that subsequent steps (document upload, slot booking) operate on a
+  /// real application id instead of a client-invented placeholder.
   Future<VendorApplicationModel> createApplication(String vendorId) async {
-    final app = VendorApplicationModel(
-      id: 'VAPP-${DateTime.now().millisecondsSinceEpoch}',
+    final draft = VendorApplicationModel(
+      id: '',
       vendorId: vendorId,
-      instrumentId: _selectedInstrument?.instrumentId ?? 'VINST-001',
+      instrumentId: _selectedInstrument?.instrumentId ?? '',
       isReverification: _isReverification,
       verificationMethod: _verificationMethod,
-      status: VendorApplicationStatus.paymentPending,
-      documentStatus: DocumentReviewStatus.pending,
-      uploadedDocuments: List.from(_uploadedDocuments.isEmpty
-          ? ['Invoice_${DateTime.now().year}.pdf', 'Model_Approval.pdf', 'Device_Plate_Photo.jpg']
-          : _uploadedDocuments),
-      gatcId: _selectedGatc?.id,
-      gatcName: _selectedGatc?.name,
-      slotDate: _selectedSlotDate,
-      slotTime: _selectedSlotTime,
-      feeInPaise: _selectedInstrument?.isWeighbridge == true ? 150000 : 50000,
+      status: VendorApplicationStatus.draft,
+      instrumentInfo: _selectedInstrument,
       createdAt: DateTime.now(),
       updatedAt: DateTime.now(),
-      instrumentInfo: _selectedInstrument,
     );
 
-    final created = await _repo.createApplication(app);
-    _applications.add(created);
+    final created = await _repo.createApplication(draft);
+    _applications = [created, ..._applications.where((a) => a.id != created.id)];
     _currentApplication = created;
     notifyListeners();
     return created;
   }
 
-  // ── Payment simulation ─────────────────────────────────────────
-  Future<PaymentModel> simulatePayment(String applicationId, int amountInPaise) async {
-    await Future.delayed(const Duration(seconds: 1));
-    final payment = PaymentModel(
-      id: 'PAY-${DateTime.now().millisecondsSinceEpoch}',
-      applicationId: applicationId,
-      amountInPaise: amountInPaise,
-      status: PaymentStatus.success,
-      provider: 'BHARATKOSH_UPI',
-      orderRef: 'ORD-${DateTime.now().millisecondsSinceEpoch}',
-      transactionRef: 'TXN-BK-${DateTime.now().millisecondsSinceEpoch}',
-      createdAt: DateTime.now(),
-    );
-
-    final idx = _applications.indexWhere((a) => a.id == applicationId);
-    if (idx >= 0) {
-      _applications[idx] = _applications[idx].copyWith(
-        status: VendorApplicationStatus.paymentComplete,
-        paymentId: payment.id,
-        updatedAt: DateTime.now(),
-      );
-      _currentApplication = _applications[idx];
-      await _repo.updateApplication(_applications[idx]);
+  /// Books the wizard-selected GATC + date/time slot against the backend
+  /// for [currentApplication], then refreshes it with the authoritative
+  /// post-booking status.
+  Future<VendorApplicationModel> bookSelectedSlot() async {
+    final app = _currentApplication;
+    final gatc = _selectedGatc;
+    final date = _selectedSlotDate;
+    final timeLabel = _selectedSlotTime;
+    if (app == null || gatc == null || date == null || timeLabel == null) {
+      throw Exception('Select a test centre, date and time slot first');
     }
 
+    final isAfternoon = timeLabel.toLowerCase().startsWith('after');
+    final slotStart = DateTime(date.year, date.month, date.day, isAfternoon ? 13 : 9);
+    final slotEnd = DateTime(date.year, date.month, date.day, isAfternoon ? 16 : 12);
+
+    final updated = await _repo.bookAppointment(
+      applicationId: app.id,
+      gatcId: gatc.id,
+      slotDate: DateTime(date.year, date.month, date.day),
+      slotStart: slotStart,
+      slotEnd: slotEnd,
+    );
+
+    final idx = _applications.indexWhere((a) => a.id == updated.id);
+    if (idx >= 0) {
+      _applications[idx] = updated;
+    } else {
+      _applications.add(updated);
+    }
+    _currentApplication = updated;
     notifyListeners();
-    return payment;
+    return updated;
   }
 
-  // ── Demo: advance application status matching bible stages ──────
-  Future<void> advanceStatus(String applicationId) async {
-    final idx = _applications.indexWhere((a) => a.id == applicationId);
-    if (idx < 0) return;
+  /// Runs the backend's mock payment gateway cycle for [currentApplication].
+  Future<PaymentModel> payForCurrentApplication() async {
+    final app = _currentApplication;
+    if (app == null) throw Exception('No active application to pay for');
 
-    final app = _applications[idx];
-    VendorApplicationStatus? next;
-    DocumentReviewStatus docStatus = app.documentStatus;
+    final payment = await _repo.payForApplication(app.id, app.feeInPaise ?? 50000);
+    _lastPayment = payment;
 
-    switch (app.status) {
-      case VendorApplicationStatus.draft:
-        next = VendorApplicationStatus.submitted;
-        break;
-      case VendorApplicationStatus.submitted:
-        next = VendorApplicationStatus.documentReview;
-        break;
-      case VendorApplicationStatus.documentReview:
-        next = VendorApplicationStatus.paymentPending;
-        docStatus = DocumentReviewStatus.approved;
-        break;
-      case VendorApplicationStatus.reuploadRequested:
-        next = VendorApplicationStatus.documentReview;
-        docStatus = DocumentReviewStatus.pending;
-        break;
-      case VendorApplicationStatus.paymentPending:
-        next = VendorApplicationStatus.paymentComplete;
-        break;
-      case VendorApplicationStatus.paymentComplete:
-        next = VendorApplicationStatus.scheduled;
-        break;
-      case VendorApplicationStatus.scheduled:
-        next = VendorApplicationStatus.lmoAssigned;
-        break;
-      case VendorApplicationStatus.lmoAssigned:
-        next = VendorApplicationStatus.inspectionInProgress;
-        break;
-      case VendorApplicationStatus.inspectionInProgress:
-        next = VendorApplicationStatus.passed;
-        break;
-      case VendorApplicationStatus.passed:
-        next = VendorApplicationStatus.departmentApproved;
-        break;
-      case VendorApplicationStatus.departmentApproved:
-        next = VendorApplicationStatus.certificateIssued;
-        break;
-      default:
-        return;
+    final updated = await _repo.getApplication(app.id);
+    if (updated != null) {
+      final idx = _applications.indexWhere((a) => a.id == updated.id);
+      if (idx >= 0) _applications[idx] = updated;
+      _currentApplication = updated;
     }
-
-    _applications[idx] = app.copyWith(
-      status: next,
-      documentStatus: docStatus,
-      assignedLmoName: next == VendorApplicationStatus.lmoAssigned ? 'Officer Rajesh Kumar' : app.assignedLmoName,
-      certificateId: next == VendorApplicationStatus.certificateIssued ? 'CERT-2026-00001' : app.certificateId,
-      updatedAt: DateTime.now(),
-    );
-    _currentApplication = _applications[idx];
-    await _repo.updateApplication(_applications[idx]);
     notifyListeners();
+    return payment;
   }
 
   // ── Wizard reset ───────────────────────────────────────────────

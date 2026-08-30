@@ -69,6 +69,11 @@ class InspectionProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<void> syncLocation(double lat, double lng) async {
+    if (_currentInspection == null) return;
+    await _repository.updateInspectionLocation(_currentInspection!.applicationId, lat, lng);
+  }
+
   void addMeasurement(MeasurementModel m) {
     if (_currentInspection == null) return;
     

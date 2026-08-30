@@ -6,7 +6,6 @@ import '../../../providers/vendor_provider.dart';
 import '../../../core/constants/app_routes.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/utils/date_formatter.dart';
-import '../../../widgets/common/demo_role_banner.dart';
 
 class VendorDashboardScreen extends StatefulWidget {
   const VendorDashboardScreen({super.key});
@@ -75,11 +74,13 @@ class _VendorDashboardScreenState extends State<VendorDashboardScreen> {
                                 user!.businessName!,
                                 style: const TextStyle(color: Colors.white70, fontSize: 14),
                               ),
-                            const SizedBox(height: 8),
-                            Text(
-                              '${user?.district ?? 'Mumbai'}, ${user?.state ?? 'Maharashtra'} • GST: ${user?.gstNumber ?? '27AAAAA0000A1Z5'}',
-                              style: const TextStyle(color: Colors.white60, fontSize: 12),
-                            ),
+                            if ((user?.city ?? '').isNotEmpty || (user?.state ?? '').isNotEmpty) ...[
+                              const SizedBox(height: 8),
+                              Text(
+                                [user?.city, user?.state].where((s) => (s ?? '').isNotEmpty).join(', '),
+                                style: const TextStyle(color: Colors.white60, fontSize: 12),
+                              ),
+                            ],
                           ],
                         ),
                       ),
@@ -315,7 +316,6 @@ class _VendorDashboardScreenState extends State<VendorDashboardScreen> {
                     ],
                   ),
                 ),
-          const DemoRoleBanner(),
         ],
       ),
     );

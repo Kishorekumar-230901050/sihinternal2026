@@ -75,5 +75,5 @@ cd calibris-lmo-ui && flutter run
 ## 🚀 Railway Deployment Settings
 - **Root Directory**: `/calibris-backend`
 - **Build**: `npm i && npx prisma generate && npm run build`
-- **Start**: `npx prisma db push && npm run start`
+- **Start**: `npx prisma db push && npm run seed && npm run start` (seed is idempotent — upserts only)
 - **Env**: `DATABASE_URL`, `DIRECT_URL`, `JWT_SECRET`, `PORT=3000`

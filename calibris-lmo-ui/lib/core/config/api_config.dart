@@ -1,8 +1,9 @@
 class ApiConfig {
   // Configurable base URL: can be overridden at build time using:
   // flutter run --dart-define=API_BASE_URL=http://localhost:3000/api
-  static const String defaultBaseUrl = 'http://localhost:3000/api';
-  static const String defaultWsUrl = 'http://localhost:3000';
+  // (useful for pointing at a local backend during development)
+  static const String defaultBaseUrl = 'https://sihinternal2026-production.up.railway.app/api';
+  static const String defaultWsUrl = 'https://sihinternal2026-production.up.railway.app';
 
   static String get baseUrl {
     const fromEnv = String.fromEnvironment('API_BASE_URL');

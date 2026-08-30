@@ -21,16 +21,25 @@ class _PaymentGatewayScreenState extends State<PaymentGatewayScreen> {
     setState(() => _isProcessing = true);
 
     final vendor = context.read<VendorProvider>();
-    final app = vendor.currentApplication;
-    final amount = app?.feeInPaise ?? 50000;
-
-    await vendor.simulatePayment(widget.applicationId, amount);
-
-    if (mounted) {
-      context.pushReplacementNamed(
-        AppRoutes.vendorPaymentReceipt,
-        pathParameters: {'id': widget.applicationId},
-      );
+    try {
+      await vendor.payForCurrentApplication();
+      if (mounted) {
+        context.pushReplacementNamed(
+          AppRoutes.vendorPaymentReceipt,
+          pathParameters: {'id': widget.applicationId},
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(e.toString().replaceFirst('Exception: ', '')),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isProcessing = false);
     }
   }
 
@@ -99,7 +108,7 @@ class _PaymentGatewayScreenState extends State<PaymentGatewayScreen> {
             const Spacer(),
 
             const Text(
-              'This is a simulated payment for demo purposes.\nNo real transaction will be processed.',
+              'This uses the department\'s sandbox payment gateway.\nNo real money is charged.',
               style: TextStyle(fontSize: 11, color: AppColors.textHint),
               textAlign: TextAlign.center,
             ),

@@ -16,8 +16,26 @@ class BookSlotScreen extends StatefulWidget {
 class _BookSlotScreenState extends State<BookSlotScreen> {
   DateTime? _selectedDate;
   String? _selectedTime;
+  bool _isBooking = false;
 
   final _availableTimes = ['Morning (9:00 AM – 12:00 PM)', 'Afternoon (1:00 PM – 4:00 PM)'];
+
+  Future<void> _confirmSlot(VendorProvider vendor) async {
+    vendor.selectSlot(_selectedDate!, _selectedTime!.split(' ').first);
+    setState(() => _isBooking = true);
+    try {
+      await vendor.bookSelectedSlot();
+      if (mounted) context.pushNamed(AppRoutes.vendorApplicationSummary);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(e.toString().replaceFirst('Exception: ', ''))),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isBooking = false);
+    }
+  }
 
   List<DateTime> _getAvailableDates() {
     final today = DateTime.now();
@@ -66,8 +84,6 @@ class _BookSlotScreenState extends State<BookSlotScreen> {
                       date.month == _selectedDate!.month &&
                       date.day == _selectedDate!.day;
                   final dayName = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'][date.weekday - 1];
-                  // Mock slot availability
-                  final slotsLeft = 20 - (index % 7) * 3;
 
                   return GestureDetector(
                     onTap: () => setState(() => _selectedDate = date),
@@ -84,7 +100,6 @@ class _BookSlotScreenState extends State<BookSlotScreen> {
                         children: [
                           Text(dayName, style: TextStyle(fontSize: 11, color: isSelected ? Colors.white70 : AppColors.textSecondary)),
                           Text('${date.day}', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: isSelected ? Colors.white : AppColors.textPrimary)),
-                          Text('$slotsLeft left', style: TextStyle(fontSize: 9, color: isSelected ? Colors.white60 : AppColors.textHint)),
                         ],
                       ),
                     ),
@@ -133,13 +148,12 @@ class _BookSlotScreenState extends State<BookSlotScreen> {
               width: double.infinity,
               height: 50,
               child: ElevatedButton(
-                onPressed: (_selectedDate == null || _selectedTime == null)
+                onPressed: (_selectedDate == null || _selectedTime == null || _isBooking)
                     ? null
-                    : () {
-                        vendor.selectSlot(_selectedDate!, _selectedTime!.split(' ').first);
-                        context.pushNamed(AppRoutes.vendorApplicationSummary);
-                      },
-                child: const Text('NEXT — Review & Pay'),
+                    : () => _confirmSlot(vendor),
+                child: _isBooking
+                    ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                    : const Text('NEXT — Review & Pay'),
               ),
             ),
             const SizedBox(height: 16),

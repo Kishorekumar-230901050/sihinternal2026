@@ -93,7 +93,16 @@ class _UploadDocumentsScreenState extends State<UploadDocumentsScreen> {
 
       final vendorProvider = context.read<VendorProvider>();
       final vendorRepo = context.read<IVendorRepository>();
-      final appId = vendorProvider.currentApplication?.id ?? 'VAPP-PENDING';
+      final appId = vendorProvider.currentApplication?.id;
+      if (appId == null) {
+        if (mounted) {
+          setState(() => slot.isUploading = false);
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('No application found. Please restart the application flow.')),
+          );
+        }
+        return;
+      }
 
       // Real upload to backend / Supabase storage
       final uploadedUrl = await vendorRepo.uploadDocument(
@@ -139,8 +148,9 @@ class _UploadDocumentsScreenState extends State<UploadDocumentsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final vendor = context.watch<VendorProvider>();
-    final anyUploaded = _slots.any((s) => s.fileName != null) || vendor.uploadedDocuments.isNotEmpty;
+    final hasPhoto = _slots.any((s) => s.slotType == 'INSTRUMENT_PHOTO' && s.fileName != null);
+    final hasSupportingDoc = _slots.any((s) => s.slotType == 'SUPPORTING_DOCUMENT' && s.fileName != null);
+    final canProceed = hasPhoto && hasSupportingDoc;
 
     return Scaffold(
       appBar: AppBar(title: const Text('Upload Documents & Photo')),
@@ -291,7 +301,7 @@ class _UploadDocumentsScreenState extends State<UploadDocumentsScreen> {
               width: double.infinity,
               height: 50,
               child: ElevatedButton(
-                onPressed: anyUploaded
+                onPressed: canProceed
                     ? () => context.pushNamed(AppRoutes.vendorFindGatc)
                     : null,
                 child: const Text('NEXT — Find Nearby GATC Centre'),

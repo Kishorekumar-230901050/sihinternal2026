@@ -8,7 +8,18 @@ class AuthResult {
 }
 
 abstract class IAuthRepository {
-  Future<AuthResult> login(String employeeId, String password);
+  Future<AuthResult> login(UserRole role, String identifier, String password);
+  Future<AuthResult> registerVendor({
+    required String fullName,
+    required String email,
+    required String phone,
+    required String password,
+    String? businessName,
+    String? addressLine,
+    String? city,
+    String? state,
+    String? pincode,
+  });
   Future<void> logout();
   Future<UserModel?> getCurrentUser();
   bool get isLoggedIn;

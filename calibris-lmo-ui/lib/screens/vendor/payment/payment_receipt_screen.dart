@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
+import '../../../providers/vendor_provider.dart';
 import '../../../core/constants/app_routes.dart';
 import '../../../core/constants/app_colors.dart';
 
@@ -9,6 +11,7 @@ class PaymentReceiptScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final payment = context.watch<VendorProvider>().lastPayment;
     return Scaffold(
       body: SafeArea(
         child: Padding(
@@ -37,12 +40,12 @@ class PaymentReceiptScreen extends StatelessWidget {
                   padding: const EdgeInsets.all(20),
                   child: Column(
                     children: [
-                      _Row(label: 'Transaction ID', value: 'TXN-BK-${DateTime.now().millisecondsSinceEpoch.toString().substring(5)}'),
+                      _Row(label: 'Transaction ID', value: payment?.transactionRef ?? 'N/A'),
+                      _Row(label: 'Order Reference', value: payment?.orderRef ?? 'N/A'),
                       _Row(label: 'Application ID', value: applicationId),
-                      _Row(label: 'Amount Paid', value: '₹500.00'),
-                      _Row(label: 'Payment Mode', value: 'Bharatkosh UPI'),
+                      _Row(label: 'Amount Paid', value: payment != null ? payment.formattedAmount : 'N/A'),
                       _Row(label: 'Status', value: 'SUCCESS', valueColor: AppColors.secondary),
-                      _Row(label: 'Date', value: DateTime.now().toString().substring(0, 16)),
+                      _Row(label: 'Date', value: (payment?.createdAt ?? DateTime.now()).toString().substring(0, 16)),
                     ],
                   ),
                 ),

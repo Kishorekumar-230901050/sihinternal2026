@@ -53,11 +53,11 @@ class _FindGatcScreenState extends State<FindGatcScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         const Text(
-                          'Live Location: Dadar, Mumbai (19.0183° N, 72.8478° E)',
+                          'Government Approved Test Centres',
                           style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
                         ),
                         Text(
-                          vendor.isGpsDetecting ? 'Refreshing GPS coordinates...' : 'Showing test centres closest to your registered address',
+                          vendor.isGpsDetecting ? 'Refreshing list...' : 'Select a centre that supports your instrument type',
                           style: const TextStyle(fontSize: 10, color: AppColors.textSecondary),
                         ),
                       ],
@@ -85,7 +85,6 @@ class _FindGatcScreenState extends State<FindGatcScreen> {
                 itemBuilder: (context, index) {
                   final gatc = gatcs[index];
                   final isSelected = vendor.selectedGatc?.id == gatc.id;
-                  final mockDistance = (index + 1) * 3.4;
 
                   return Card(
                     margin: const EdgeInsets.only(bottom: 10),
@@ -125,8 +124,10 @@ class _FindGatcScreenState extends State<FindGatcScreen> {
                                   const SizedBox(height: 6),
                                   Row(
                                     children: [
-                                      _Chip(icon: Icons.near_me, label: '${mockDistance.toStringAsFixed(1)} km away'),
-                                      const SizedBox(width: 8),
+                                      if (gatc.distanceKm != null) ...[
+                                        _Chip(icon: Icons.near_me, label: '${gatc.distanceKm!.toStringAsFixed(1)} km away'),
+                                        const SizedBox(width: 8),
+                                      ],
                                       _Chip(icon: Icons.people, label: '${gatc.dailyCapacity}/day'),
                                       const SizedBox(width: 8),
                                       if (gatc.contactPhone != null)

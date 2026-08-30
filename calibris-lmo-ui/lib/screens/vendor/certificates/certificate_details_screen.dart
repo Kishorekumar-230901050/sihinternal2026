@@ -4,6 +4,7 @@ import 'package:qr_flutter/qr_flutter.dart';
 import '../../../providers/vendor_provider.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/utils/date_formatter.dart';
+import '../../../core/config/api_config.dart';
 import '../../../widgets/common/info_row.dart';
 
 class CertificateDetailsScreen extends StatelessWidget {
@@ -23,6 +24,7 @@ class CertificateDetailsScreen extends StatelessWidget {
     }
 
     final isActive = cert.status.name == 'active';
+    final verifyUrl = cert.qrToken != null ? ApiConfig.publicVerifyQr(cert.qrToken!) : null;
 
     return Scaffold(
       appBar: AppBar(title: const Text('Certificate Details')),
@@ -67,19 +69,22 @@ class CertificateDetailsScreen extends StatelessWidget {
                   children: [
                     const Text('Scan to Verify', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
                     const SizedBox(height: 12),
-                    QrImageView(
-                      data: 'https://verify.calibris.gov.in/c/${cert.id}',
-                      version: QrVersions.auto,
-                      size: 180,
-                      gapless: true,
-                      embeddedImage: null,
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'https://verify.calibris.gov.in/c/${cert.id}',
-                      style: const TextStyle(fontSize: 10, color: AppColors.textHint),
-                      textAlign: TextAlign.center,
-                    ),
+                    if (verifyUrl != null) ...[
+                      QrImageView(
+                        data: verifyUrl,
+                        version: QrVersions.auto,
+                        size: 180,
+                        gapless: true,
+                      ),
+                      const SizedBox(height: 8),
+                      SelectableText(
+                        verifyUrl,
+                        style: const TextStyle(fontSize: 10, color: AppColors.textHint),
+                        textAlign: TextAlign.center,
+                      ),
+                    ] else
+                      const Text('QR unavailable — certificate details still syncing.',
+                          style: TextStyle(fontSize: 12, color: AppColors.textHint)),
                   ],
                 ),
               ),
@@ -108,18 +113,26 @@ class CertificateDetailsScreen extends StatelessWidget {
             ),
             const SizedBox(height: 16),
 
-            SizedBox(
-              width: double.infinity,
-              child: OutlinedButton.icon(
-                icon: const Icon(Icons.download),
-                label: const Text('DOWNLOAD CERTIFICATE PDF'),
-                onPressed: () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('PDF download simulated (demo mode)')),
-                  );
-                },
-              ),
-            ),
+            if (cert.pdfUrl != null)
+              Card(
+                color: AppColors.surface,
+                child: Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text('Certificate PDF', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+                      const SizedBox(height: 6),
+                      SelectableText(cert.pdfUrl!, style: const TextStyle(fontSize: 11, color: AppColors.primary)),
+                      const SizedBox(height: 4),
+                      const Text('Open this link in a browser to view or download the signed PDF.',
+                          style: TextStyle(fontSize: 10, color: AppColors.textHint)),
+                    ],
+                  ),
+                ),
+              )
+            else
+              const Text('Certificate PDF is still being generated.', style: TextStyle(fontSize: 12, color: AppColors.textHint)),
             const SizedBox(height: 24),
           ],
         ),

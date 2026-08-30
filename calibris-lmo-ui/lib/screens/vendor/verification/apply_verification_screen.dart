@@ -2,16 +2,42 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
 import '../../../providers/vendor_provider.dart';
+import '../../../providers/auth_provider.dart';
 import '../../../core/constants/app_routes.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../data/models/instrument_model.dart';
 import '../../../data/models/vendor_application_model.dart';
 
-class ApplyVerificationScreen extends StatelessWidget {
+class ApplyVerificationScreen extends StatefulWidget {
   const ApplyVerificationScreen({super.key});
+
+  @override
+  State<ApplyVerificationScreen> createState() => _ApplyVerificationScreenState();
+}
+
+class _ApplyVerificationScreenState extends State<ApplyVerificationScreen> {
+  bool _isSubmitting = false;
 
   String _typeLabel(InstrumentType type) {
     return type.name.replaceAllMapped(RegExp(r'([A-Z])'), (m) => ' ${m.group(0)}').trim();
+  }
+
+  Future<void> _next(VendorProvider vendor) async {
+    final userId = context.read<AuthProvider>().currentUser?.id;
+    if (userId == null) return;
+    setState(() => _isSubmitting = true);
+    try {
+      await vendor.createApplication(userId);
+      if (mounted) context.pushNamed(AppRoutes.vendorApplyUploadDocs);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(e.toString().replaceFirst('Exception: ', '')), backgroundColor: AppColors.error),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isSubmitting = false);
+    }
   }
 
   @override
@@ -220,10 +246,10 @@ class ApplyVerificationScreen extends StatelessWidget {
               width: double.infinity,
               height: 50,
               child: ElevatedButton(
-                onPressed: vendor.selectedInstrument == null
-                    ? null
-                    : () => context.pushNamed(AppRoutes.vendorApplyUploadDocs),
-                child: const Text('NEXT — Upload Document & Photo'),
+                onPressed: (vendor.selectedInstrument == null || _isSubmitting) ? null : () => _next(vendor),
+                child: _isSubmitting
+                    ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                    : const Text('NEXT — Upload Document & Photo'),
               ),
             ),
             const SizedBox(height: 16),

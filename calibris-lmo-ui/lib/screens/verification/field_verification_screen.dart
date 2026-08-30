@@ -41,13 +41,15 @@ class _FieldVerificationScreenState extends State<FieldVerificationScreen> {
         _distance = dist;
       });
 
-      context.read<InspectionProvider>().updateInspectionField(
+      final inspectionProvider = context.read<InspectionProvider>();
+      inspectionProvider.updateInspectionField(
         inspectionLat: pos.latitude,
         inspectionLng: pos.longitude,
         gpsAccuracy: pos.accuracy,
         distanceFromRegistered: dist,
         withinGeofence: isWithin,
       );
+      await inspectionProvider.syncLocation(pos.latitude, pos.longitude);
     }
     
     if (mounted) {

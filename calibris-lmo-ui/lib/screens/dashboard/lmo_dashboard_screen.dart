@@ -12,7 +12,6 @@ import '../../widgets/common/app_drawer.dart';
 import '../../widgets/common/section_header.dart';
 import '../../widgets/dashboard/stat_card.dart';
 import '../../widgets/dashboard/application_card.dart';
-import '../../widgets/common/demo_role_banner.dart';
 
 class LmoDashboardScreen extends StatefulWidget {
   const LmoDashboardScreen({super.key});
@@ -213,7 +212,6 @@ class _LmoDashboardScreenState extends State<LmoDashboardScreen> {
                     ],
                   ),
                 ),
-          const DemoRoleBanner(),
         ],
       ),
     );

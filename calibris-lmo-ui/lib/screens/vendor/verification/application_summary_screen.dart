@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
-import '../../../providers/auth_provider.dart';
 import '../../../providers/vendor_provider.dart';
 import '../../../core/constants/app_routes.dart';
 import '../../../core/constants/app_colors.dart';
@@ -17,7 +16,7 @@ class ApplicationSummaryScreen extends StatelessWidget {
     final vendor = context.watch<VendorProvider>();
     final inst = vendor.selectedInstrument;
     final gatc = vendor.selectedGatc;
-    final fee = inst?.isWeighbridge == true ? 150000 : 50000; // paise
+    final fee = vendor.currentApplication?.feeInPaise ?? (inst?.isWeighbridge == true ? 150000 : 50000); // paise
 
     return Scaffold(
       appBar: AppBar(title: const Text('Application Summary')),
@@ -147,18 +146,13 @@ class ApplicationSummaryScreen extends StatelessWidget {
               height: 50,
               child: ElevatedButton(
                 style: ElevatedButton.styleFrom(backgroundColor: AppColors.secondary),
-                onPressed: () async {
-                  final user = context.read<AuthProvider>().currentUser;
-                  if (user == null) return;
-                  final app = await vendor.createApplication(user.id);
-                  if (context.mounted) {
-                    context.pushNamed(
-                      AppRoutes.vendorPaymentGateway,
-                      pathParameters: {'id': app.id},
-                    );
-                  }
-                },
-                child: const Text('SUBMIT & PROCEED TO ONLINE FEE PAYMENT'),
+                onPressed: vendor.currentApplication == null
+                    ? null
+                    : () => context.pushNamed(
+                          AppRoutes.vendorPaymentGateway,
+                          pathParameters: {'id': vendor.currentApplication!.id},
+                        ),
+                child: const Text('PROCEED TO ONLINE FEE PAYMENT'),
               ),
             ),
             const SizedBox(height: 16),

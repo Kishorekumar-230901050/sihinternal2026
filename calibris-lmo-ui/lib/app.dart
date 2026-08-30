@@ -16,12 +16,7 @@ import 'providers/device_provider.dart';
 import 'providers/vendor_provider.dart';
 
 // Repositories
-import 'data/repositories/mock_auth_repository.dart';
-import 'data/repositories/mock_application_repository.dart';
-import 'data/repositories/mock_inspection_repository.dart';
-import 'data/repositories/mock_notification_repository.dart';
 import 'data/repositories/mock_certificate_repository.dart';
-import 'data/repositories/mock_vendor_repository.dart';
 
 // Services
 import 'services/api_client.dart';

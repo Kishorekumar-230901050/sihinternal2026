@@ -165,6 +165,7 @@ export async function getApplication(req: Request, res: Response) {
   const application = await prisma.application.findUnique({
     where: { id: req.params.id },
     include: {
+      vendor: { select: { fullName: true, businessName: true, phone: true, email: true, addressLine: true, city: true, state: true, pincode: true } },
       instrument: { include: { instrumentType: true } },
       gatc: { include: { location: true } },
       assignedLmo: { select: { id: true, fullName: true, employeeCode: true } },

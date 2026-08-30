@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
 import '../../../providers/vendor_provider.dart';
+import '../../../providers/auth_provider.dart';
 import '../../../core/constants/app_routes.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/utils/date_formatter.dart';
@@ -70,7 +71,19 @@ class ApplicationTrackingScreen extends StatelessWidget {
     final isComplete = app.status == VendorApplicationStatus.certificateIssued;
 
     return Scaffold(
-      appBar: AppBar(title: Text('Track ${app.id}')),
+      appBar: AppBar(
+        title: Text('Track ${app.id}'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            tooltip: 'Refresh status',
+            onPressed: () {
+              final userId = context.read<AuthProvider>().currentUser?.id;
+              if (userId != null) context.read<VendorProvider>().loadAll(userId);
+            },
+          ),
+        ],
+      ),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
@@ -278,44 +291,6 @@ class ApplicationTrackingScreen extends StatelessWidget {
             ),
           ],
 
-          const SizedBox(height: 24),
-
-          // ── Demonstration Mode Step Advancer ──
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: AppColors.demoGold.withOpacity(0.06),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: AppColors.demoGold.withOpacity(0.2)),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Row(
-                  children: [
-                    Icon(Icons.science, size: 16, color: AppColors.demoGold),
-                    SizedBox(width: 6),
-                    Text('DEMO WORKFLOW CONTROLLER', style: TextStyle(color: AppColors.demoGold, fontWeight: FontWeight.bold, fontSize: 12)),
-                  ],
-                ),
-                const SizedBox(height: 6),
-                const Text('Advance this application to the next bible stage for demonstration.',
-                    style: TextStyle(fontSize: 11, color: AppColors.textSecondary)),
-                const SizedBox(height: 12),
-                SizedBox(
-                  width: double.infinity,
-                  child: OutlinedButton.icon(
-                    icon: const Icon(Icons.skip_next),
-                    label: const Text('Advance to Next Stage'),
-                    style: OutlinedButton.styleFrom(foregroundColor: AppColors.demoGold, side: const BorderSide(color: AppColors.demoGold)),
-                    onPressed: (isComplete || isRejected)
-                        ? null
-                        : () => vendor.advanceStatus(app.id),
-                  ),
-                ),
-              ],
-            ),
-          ),
           const SizedBox(height: 24),
         ],
       ),

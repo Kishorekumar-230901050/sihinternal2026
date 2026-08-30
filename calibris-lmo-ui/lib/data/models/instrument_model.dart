@@ -24,6 +24,7 @@ class InstrumentInfo {
   final String? photoUrl;
   final DateTime? lastVerificationDate;
   final String? lastCertificateId;
+  final String? backendInstrumentTypeId;
 
   const InstrumentInfo({
     required this.instrumentId,
@@ -41,6 +42,7 @@ class InstrumentInfo {
     this.photoUrl,
     this.lastVerificationDate,
     this.lastCertificateId,
+    this.backendInstrumentTypeId,
   });
 
   String get effectiveUniqueId => uniqueId ?? 'CLM-IND-2026-${instrumentId.replaceAll(RegExp(r'[^0-9]'), '').padLeft(5, '0')}';
@@ -54,6 +56,40 @@ class InstrumentInfo {
   bool get isSmallDevice => type != InstrumentType.platformWeighbridge;
 
   bool get isFuelPump => type == InstrumentType.petrolPumpDispenser;
+
+  /// Maps a raw `Instrument` JSON object as returned by calibris-backend
+  /// (see prisma schema `Instrument`/`InstrumentType`) into the app's model.
+  /// Backend doesn't track accuracy class or a registered lat/lng for the
+  /// instrument itself (only the GATC has coordinates), so those use
+  /// reasonable defaults.
+  factory InstrumentInfo.fromBackendJson(Map<String, dynamic> json) {
+    final typeObj = json['instrumentType'] as Map<String, dynamic>?;
+    final code = (typeObj?['code'] ?? '').toString().toUpperCase();
+    final name = (typeObj?['name'] ?? '').toString().toUpperCase();
+    final InstrumentType type;
+    if (code.contains('WB') || code.contains('WEIGHBRIDGE') || name.contains('WEIGHBRIDGE')) {
+      type = InstrumentType.platformWeighbridge;
+    } else if (code.contains('FDS') || code.contains('FUEL') || name.contains('FUEL')) {
+      type = InstrumentType.petrolPumpDispenser;
+    } else {
+      type = InstrumentType.electronicWeighingScale;
+    }
+    return InstrumentInfo(
+      instrumentId: json['id']?.toString() ?? '',
+      uniqueId: json['serialNumber']?.toString(),
+      type: type,
+      manufacturer: json['manufacturer']?.toString() ?? 'Unknown',
+      model: json['model']?.toString() ?? 'Standard',
+      serialNumber: json['serialNumber']?.toString() ?? '',
+      capacity: json['capacity']?.toString() ?? 'N/A',
+      accuracyClass: 'Class III',
+      registeredLocationLat: 0.0,
+      registeredLocationLng: 0.0,
+      registeredAddress: '',
+      isDigitalCompatible: true,
+      backendInstrumentTypeId: json['instrumentTypeId']?.toString() ?? typeObj?['id']?.toString(),
+    );
+  }
 
   factory InstrumentInfo.fromJson(Map<String, dynamic> json) {
     return InstrumentInfo(
