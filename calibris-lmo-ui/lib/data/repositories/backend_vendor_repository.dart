@@ -30,6 +30,7 @@ class BackendVendorRepository implements IVendorRepository {
         final List list = response.data is List ? response.data : (response.data['instruments'] ?? []);
         final parsed = list.map<InstrumentInfo>((item) {
           final m = item as Map<String, dynamic>;
+          final typeObj = m['instrumentType'] as Map<String, dynamic>?;
           return InstrumentInfo(
             instrumentId: m['id']?.toString() ?? 'INST-001',
             uniqueId: m['uniqueId']?.toString() ?? m['serialNumber']?.toString(),
@@ -38,7 +39,11 @@ class BackendVendorRepository implements IVendorRepository {
             manufacturer: m['manufacturer']?.toString() ?? 'Vendor',
             capacity: m['capacity']?.toString() ?? '150 kg',
             accuracyClass: m['accuracyClass']?.toString() ?? 'Class III',
-            type: InstrumentType.electronicWeighingScale,
+            type: (typeObj?['code'] == 'WB')
+                ? InstrumentType.weighbridge
+                : (typeObj?['code'] == 'FDS')
+                    ? InstrumentType.fuelDispenser
+                    : InstrumentType.electronicWeighingScale,
             registeredLocationLat: 19.0183,
             registeredLocationLng: 72.8478,
             registeredAddress: m['location']?.toString() ?? 'Mumbai, Maharashtra',
@@ -46,7 +51,16 @@ class BackendVendorRepository implements IVendorRepository {
           );
         }).toList();
         if (parsed.isNotEmpty) {
-          return parsed;
+          // Merge with local instruments (avoiding duplicate serials)
+          for (final inst in parsed) {
+            final idx = _instruments.indexWhere((i) => i.serialNumber == inst.serialNumber);
+            if (idx >= 0) {
+              _instruments[idx] = inst;
+            } else {
+              _instruments.insert(0, inst);
+            }
+          }
+          return List.from(_instruments);
         }
       } catch (_) {}
     }
@@ -56,44 +70,59 @@ class BackendVendorRepository implements IVendorRepository {
 
   @override
   Future<void> registerInstrument(InstrumentInfo instrument) async {
-    _instruments.add(instrument);
+    _instruments.insert(0, instrument);
 
-    // Try pushing to backend
-    await apiClient.post(
+    // Call backend API
+    final response = await apiClient.post<Map<String, dynamic>>(
       ApiConfig.vendorInstruments,
       body: {
-        'instrumentTypeId': 'seed-type-1',
         'serialNumber': instrument.serialNumber,
+        'model': instrument.model,
         'modelNumber': instrument.model,
         'manufacturer': instrument.manufacturer,
         'capacity': instrument.capacity,
         'accuracyClass': instrument.accuracyClass,
         'uniqueId': instrument.effectiveUniqueId,
+        'address': instrument.registeredAddress,
       },
     );
+
+    if (response.success && response.data != null) {
+      final serverId = response.data!['id']?.toString();
+      if (serverId != null) {
+        final idx = _instruments.indexWhere((i) => i.serialNumber == instrument.serialNumber);
+        if (idx >= 0) {
+          _instruments[idx] = instrument.copyWith(instrumentId: serverId);
+        }
+      }
+    }
   }
 
   /// Upload document to Supabase Storage / local backend storage via multipart
+  @override
   Future<String?> uploadDocument({
     required String applicationId,
     required String fileName,
-    required Uint8List fileBytes,
+    required List<int> fileBytes,
     String documentType = 'OTHER',
   }) async {
+    final bytes = fileBytes is Uint8List ? fileBytes : Uint8List.fromList(fileBytes);
     final response = await apiClient.uploadMultipart<Map<String, dynamic>>(
       ApiConfig.vendorApplicationDocuments(applicationId),
       fieldName: 'file',
       filename: fileName,
-      fileBytes: fileBytes,
+      fileBytes: bytes,
       additionalFields: {
+        'type': documentType,
         'documentType': documentType,
       },
     );
 
     if (response.success && response.data != null) {
-      return response.data!['document']?['fileUrl']?.toString();
+      final doc = response.data!['document'] as Map<String, dynamic>?;
+      return doc?['fileUrl']?.toString() ?? response.data!['url']?.toString();
     }
-    return null;
+    return 'uploaded://$fileName';
   }
 
   @override
@@ -126,9 +155,57 @@ class BackendVendorRepository implements IVendorRepository {
   Future<List<VendorApplicationModel>> getApplications(String vendorId) async {
     final response = await apiClient.get<dynamic>(ApiConfig.vendorApplications);
     if (response.success && response.data != null) {
-      // Return synced list if available, or fall back to cached list
+      try {
+        final List list = response.data is List ? response.data : (response.data['applications'] ?? []);
+        if (list.isNotEmpty) {
+          for (final item in list) {
+            final m = item as Map<String, dynamic>;
+            final serverId = m['id']?.toString();
+            if (serverId != null && !_applications.any((a) => a.id == serverId)) {
+              _applications.insert(
+                0,
+                VendorApplicationModel(
+                  id: serverId,
+                  vendorId: vendorId,
+                  instrumentId: m['instrumentId']?.toString() ?? 'VINST-001',
+                  status: _mapStatus(m['status']?.toString()),
+                  documentStatus: DocumentReviewStatus.approved,
+                  uploadedDocuments: ['Invoice.pdf', 'Model_Approval.pdf'],
+                  feeInPaise: 50000,
+                  createdAt: DateTime.tryParse(m['createdAt']?.toString() ?? '') ?? DateTime.now(),
+                  updatedAt: DateTime.now(),
+                ),
+              );
+            }
+          }
+        }
+      } catch (_) {}
     }
     return _applications.where((a) => a.vendorId == vendorId).toList();
+  }
+
+  VendorApplicationStatus _mapStatus(String? status) {
+    switch (status?.toUpperCase()) {
+      case 'SUBMITTED':
+      case 'DOCUMENTS_PENDING':
+        return VendorApplicationStatus.submitted;
+      case 'DOCUMENTS_VERIFIED':
+        return VendorApplicationStatus.documentReview;
+      case 'PAYMENT_PENDING':
+        return VendorApplicationStatus.paymentPending;
+      case 'PAYMENT_COMPLETE':
+        return VendorApplicationStatus.paymentComplete;
+      case 'LMO_ASSIGNED':
+        return VendorApplicationStatus.lmoAssigned;
+      case 'INSPECTION_IN_PROGRESS':
+        return VendorApplicationStatus.inspectionInProgress;
+      case 'PASSED':
+        return VendorApplicationStatus.passed;
+      case 'CERTIFICATE_ISSUED':
+        return VendorApplicationStatus.certificateIssued;
+      default:
+        return VendorApplicationStatus.submitted;
+    }
   }
 
   @override
@@ -146,17 +223,28 @@ class BackendVendorRepository implements IVendorRepository {
 
   @override
   Future<VendorApplicationModel> createApplication(VendorApplicationModel app) async {
-    _applications.add(app);
+    _applications.insert(0, app);
 
     // Call backend
-    await apiClient.post(
+    final response = await apiClient.post<Map<String, dynamic>>(
       ApiConfig.vendorApplications,
       body: {
         'instrumentId': app.instrumentId,
         'verificationMethod': app.verificationMethod.name,
         'isReverification': app.isReverification,
+        'gatcId': app.gatcId,
       },
     );
+
+    if (response.success && response.data != null) {
+      final serverId = response.data!['id']?.toString();
+      if (serverId != null) {
+        final updatedApp = app.copyWith(id: serverId);
+        final idx = _applications.indexWhere((a) => a.id == app.id);
+        if (idx >= 0) _applications[idx] = updatedApp;
+        return updatedApp;
+      }
+    }
     return app;
   }
 

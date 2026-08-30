@@ -16,4 +16,10 @@ abstract class IVendorRepository {
   Future<List<PaymentModel>> getPayments(String vendorId);
   Future<List<CertificateModel>> getCertificates(String vendorId);
   Future<CertificateModel?> getCertificate(String certId);
+  Future<String?> uploadDocument({
+    required String applicationId,
+    required String fileName,
+    required List<int> fileBytes,
+    String documentType = 'OTHER',
+  });
 }

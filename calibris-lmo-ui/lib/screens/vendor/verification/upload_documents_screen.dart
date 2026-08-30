@@ -1,9 +1,33 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
+import 'package:file_picker/file_picker.dart';
 import '../../../providers/vendor_provider.dart';
+import '../../../data/repositories/i_vendor_repository.dart';
 import '../../../core/constants/app_routes.dart';
 import '../../../core/constants/app_colors.dart';
+
+class _UploadedFileInfo {
+  final String slotType;
+  final String title;
+  final String subtitle;
+  final IconData icon;
+  String? fileName;
+  int? fileSizeBytes;
+  String? uploadedUrl;
+  bool isUploading;
+
+  _UploadedFileInfo({
+    required this.slotType,
+    required this.title,
+    required this.subtitle,
+    required this.icon,
+    this.fileName,
+    this.fileSizeBytes,
+    this.uploadedUrl,
+    this.isUploading = false,
+  });
+}
 
 class UploadDocumentsScreen extends StatefulWidget {
   const UploadDocumentsScreen({super.key});
@@ -13,47 +37,110 @@ class UploadDocumentsScreen extends StatefulWidget {
 }
 
 class _UploadDocumentsScreenState extends State<UploadDocumentsScreen> {
-  final List<({String type, String title, String subtitle, String? fileName, IconData icon})> _docSlots = [
-    (
-      type: 'invoice',
-      title: 'Purchase Invoice / Bill of Sale',
+  final List<_UploadedFileInfo> _slots = [
+    _UploadedFileInfo(
+      slotType: 'SUPPORTING_DOCUMENT',
+      title: 'Purchase Invoice / Bill of Sale (PDF)',
       subtitle: 'Original purchase receipt or invoice with GST details',
-      fileName: 'Invoice_2026_ABC_Traders.pdf',
       icon: Icons.receipt_long,
     ),
-    (
-      type: 'modelApproval',
-      title: 'Model Approval Certificate',
+    _UploadedFileInfo(
+      slotType: 'SUPPORTING_DOCUMENT',
+      title: 'Model Approval Certificate (PDF)',
       subtitle: 'Issued by Legal Metrology Department (Directorate)',
-      fileName: 'Model_Approval_Cert_IndGov.pdf',
       icon: Icons.verified_user,
     ),
-    (
-      type: 'instrumentPhoto',
+    _UploadedFileInfo(
+      slotType: 'INSTRUMENT_PHOTO',
       title: 'Instrument Photo with Serial Plate',
       subtitle: 'Clear front photo showing manufacturer label & serial no.',
-      fileName: 'Instrument_Plate_Front.jpg',
       icon: Icons.camera_alt,
     ),
   ];
 
-  @override
-  void initState() {
-    super.initState();
-    // Initialize provider with default demo documents
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      final vendor = context.read<VendorProvider>();
-      for (final slot in _docSlots) {
-        if (slot.fileName != null) {
-          vendor.addUploadedDocument(slot.fileName!);
+  String _formatSize(int bytes) {
+    if (bytes < 1024) return '$bytes B';
+    if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(1)} KB';
+    return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
+  }
+
+  Future<void> _pickAndUploadFile(_UploadedFileInfo slot) async {
+    try {
+      final result = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: ['pdf', 'png', 'jpg', 'jpeg', 'doc', 'docx'],
+        withData: true,
+      );
+
+      if (result == null || result.files.isEmpty) return;
+
+      final file = result.files.single;
+      final fileBytes = file.bytes;
+      if (fileBytes == null || fileBytes.isEmpty) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Could not read file data. Please try again.')),
+          );
         }
+        return;
       }
-    });
+
+      setState(() {
+        slot.isUploading = true;
+        slot.fileName = file.name;
+        slot.fileSizeBytes = file.size;
+      });
+
+      final vendorProvider = context.read<VendorProvider>();
+      final vendorRepo = context.read<IVendorRepository>();
+      final appId = vendorProvider.currentApplication?.id ?? 'VAPP-PENDING';
+
+      // Real upload to backend / Supabase storage
+      final uploadedUrl = await vendorRepo.uploadDocument(
+        applicationId: appId,
+        fileName: file.name,
+        fileBytes: fileBytes,
+        documentType: slot.slotType,
+      );
+
+      if (mounted) {
+        setState(() {
+          slot.isUploading = false;
+          slot.uploadedUrl = uploadedUrl;
+        });
+
+        vendorProvider.addUploadedDocument(file.name);
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            backgroundColor: AppColors.secondary,
+            content: Row(
+              children: [
+                const Icon(Icons.check_circle, color: Colors.white, size: 20),
+                const SizedBox(width: 8),
+                Expanded(child: Text('${file.name} uploaded successfully!')),
+              ],
+            ),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => slot.isUploading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            backgroundColor: AppColors.error,
+            content: Text('Upload failed: ${e.toString()}'),
+          ),
+        );
+      }
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     final vendor = context.watch<VendorProvider>();
+    final anyUploaded = _slots.any((s) => s.fileName != null) || vendor.uploadedDocuments.isNotEmpty;
 
     return Scaffold(
       appBar: AppBar(title: const Text('Upload Documents & Photo')),
@@ -68,22 +155,24 @@ class _UploadDocumentsScreenState extends State<UploadDocumentsScreen> {
                 color: AppColors.vendorAccent.withOpacity(0.1),
                 borderRadius: BorderRadius.circular(8),
               ),
-              child: const Text('Step 2 of 5 — Upload Document & Photo',
-                  style: TextStyle(color: AppColors.vendorAccent, fontWeight: FontWeight.w600, fontSize: 13)),
+              child: const Text(
+                'Step 2 of 5 — Upload Document & Photo',
+                style: TextStyle(color: AppColors.vendorAccent, fontWeight: FontWeight.w600, fontSize: 13),
+              ),
             ),
             const SizedBox(height: 12),
             Text(
-              'Upload required documents and a geotagged photo of the instrument for LMO verification.',
+              'Upload your actual PDF documents or photos. Files are securely uploaded to backend storage.',
               style: Theme.of(context).textTheme.bodyMedium,
             ),
             const SizedBox(height: 16),
 
             Expanded(
               child: ListView.builder(
-                itemCount: _docSlots.length,
+                itemCount: _slots.length,
                 itemBuilder: (context, index) {
-                  final slot = _docSlots[index];
-                  final isUploaded = slot.fileName != null && vendor.uploadedDocuments.contains(slot.fileName);
+                  final slot = _slots[index];
+                  final isUploaded = slot.fileName != null;
 
                   return Card(
                     margin: const EdgeInsets.only(bottom: 14),
@@ -130,7 +219,16 @@ class _UploadDocumentsScreenState extends State<UploadDocumentsScreen> {
                             ],
                           ),
                           const SizedBox(height: 12),
-                          if (isUploaded) ...[
+
+                          if (slot.isUploading) ...[
+                            const Row(
+                              children: [
+                                SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2)),
+                                SizedBox(width: 12),
+                                Text('Uploading to backend storage...', style: TextStyle(fontSize: 12, color: AppColors.primary)),
+                              ],
+                            ),
+                          ] else if (isUploaded) ...[
                             Container(
                               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                               decoration: BoxDecoration(
@@ -143,36 +241,42 @@ class _UploadDocumentsScreenState extends State<UploadDocumentsScreen> {
                                   const Icon(Icons.check_circle, color: AppColors.secondary, size: 18),
                                   const SizedBox(width: 8),
                                   Expanded(
-                                    child: Text(
-                                      slot.fileName!,
-                                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
-                                      overflow: TextOverflow.ellipsis,
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          slot.fileName!,
+                                          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                        if (slot.fileSizeBytes != null)
+                                          Text(
+                                            'Size: ${_formatSize(slot.fileSizeBytes!)} • Verified',
+                                            style: const TextStyle(fontSize: 10, color: AppColors.secondary),
+                                          ),
+                                      ],
                                     ),
                                   ),
                                   TextButton(
-                                    onPressed: () {
-                                      vendor.removeUploadedDocument(slot.fileName!);
-                                      ScaffoldMessenger.of(context).showSnackBar(
-                                        const SnackBar(content: Text('Document removed')),
-                                      );
-                                    },
-                                    child: const Text('Change', style: TextStyle(fontSize: 12)),
+                                    onPressed: () => _pickAndUploadFile(slot),
+                                    child: const Text('Change File', style: TextStyle(fontSize: 12)),
                                   ),
                                 ],
                               ),
                             ),
                           ] else ...[
-                            OutlinedButton.icon(
-                              icon: const Icon(Icons.file_upload_outlined, size: 18),
-                              label: const Text('Upload File / Capture Photo'),
-                              onPressed: () {
-                                if (slot.fileName != null) {
-                                  vendor.addUploadedDocument(slot.fileName!);
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(content: Text('${slot.title} uploaded successfully!')),
-                                  );
-                                }
-                              },
+                            Row(
+                              children: [
+                                ElevatedButton.icon(
+                                  icon: const Icon(Icons.upload_file, size: 18),
+                                  label: const Text('Choose PDF / Photo'),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: AppColors.primary,
+                                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                                  ),
+                                  onPressed: () => _pickAndUploadFile(slot),
+                                ),
+                              ],
                             ),
                           ],
                         ],
@@ -187,9 +291,9 @@ class _UploadDocumentsScreenState extends State<UploadDocumentsScreen> {
               width: double.infinity,
               height: 50,
               child: ElevatedButton(
-                onPressed: vendor.uploadedDocuments.isEmpty
-                    ? null
-                    : () => context.pushNamed(AppRoutes.vendorFindGatc),
+                onPressed: anyUploaded
+                    ? () => context.pushNamed(AppRoutes.vendorFindGatc)
+                    : null,
                 child: const Text('NEXT — Find Nearby GATC Centre'),
               ),
             ),

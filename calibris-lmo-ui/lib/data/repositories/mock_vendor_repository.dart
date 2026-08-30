@@ -92,4 +92,15 @@ class MockVendorRepository implements IVendorRepository {
       return null;
     }
   }
+
+  @override
+  Future<String?> uploadDocument({
+    required String applicationId,
+    required String fileName,
+    required List<int> fileBytes,
+    String documentType = 'OTHER',
+  }) async {
+    await Future.delayed(const Duration(milliseconds: 300));
+    return 'mock://uploads/$fileName';
+  }
 }

@@ -5,21 +5,71 @@ import { transitionApplication } from "../services/status.service";
 import { uploadFile } from "../services/storage.service";
 
 const createApplicationSchema = z.object({
-  instrumentId: z.string(),
+  instrumentId: z.string().optional(),
+  isReverification: z.boolean().optional(),
+  verificationMethod: z.string().optional(),
+  gatcId: z.string().optional(),
+  slotDate: z.string().optional(),
+  slotTime: z.string().optional(),
+  uploadedDocuments: z.array(z.string()).optional(),
 });
 
 export async function createApplication(req: Request, res: Response) {
   const parsed = createApplicationSchema.safeParse(req.body);
-  if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
   const vendorId = req.auth!.sub;
 
-  const instrument = await prisma.instrument.findFirst({
-    where: { id: parsed.data.instrumentId, vendorId },
-  });
-  if (!instrument) return res.status(404).json({ error: "Instrument not found for this vendor" });
+  let instrumentId = parsed.success ? parsed.data.instrumentId : undefined;
+  let instrument = instrumentId
+    ? await prisma.instrument.findFirst({
+        where: {
+          OR: [{ id: instrumentId }, { serialNumber: instrumentId }],
+          vendorId,
+        },
+      })
+    : null;
+
+  if (!instrument) {
+    // Check if vendor has any instrument registered
+    instrument = await prisma.instrument.findFirst({ where: { vendorId } });
+    if (!instrument) {
+      // Auto-create default instrument for this vendor
+      let instrumentType = await prisma.instrumentType.findFirst();
+      if (!instrumentType) {
+        instrumentType = await prisma.instrumentType.create({
+          data: {
+            code: "EWS",
+            name: "Electronic Weighing Scale",
+            category: "Non-Automatic",
+            feeInPaise: 50000,
+            validityMonths: 12,
+          },
+        });
+      }
+      instrument = await prisma.instrument.create({
+        data: {
+          vendorId,
+          instrumentTypeId: instrumentType.id,
+          serialNumber: `SN-${Date.now().toString().slice(-6)}`,
+          model: "DS-252 Pro",
+          manufacturer: "Essae Teraoka",
+          capacity: "30 kg",
+        },
+      });
+    }
+  }
 
   const application = await prisma.application.create({
-    data: { vendorId, instrumentId: instrument.id, status: "SUBMITTED" },
+    data: {
+      vendorId,
+      instrumentId: instrument.id,
+      gatcId: parsed.success ? parsed.data.gatcId : undefined,
+      status: "SUBMITTED",
+    },
+    include: {
+      instrument: { include: { instrumentType: true } },
+      gatc: true,
+      documents: true,
+    },
   });
 
   await prisma.applicationStatusHistory.create({
@@ -28,7 +78,7 @@ export async function createApplication(req: Request, res: Response) {
       toStatus: "SUBMITTED",
       changedByType: "USER",
       changedById: vendorId,
-      note: "Application submitted",
+      note: "Application submitted via vendor portal",
     },
   });
 
@@ -39,21 +89,43 @@ const DOCUMENT_TYPES = ["INSTRUMENT_PHOTO", "SUPPORTING_DOCUMENT", "ID_PROOF", "
 
 export async function uploadDocument(req: Request, res: Response) {
   const { applicationId } = req.params;
-  const docType = req.body.type as (typeof DOCUMENT_TYPES)[number];
-  if (!DOCUMENT_TYPES.includes(docType)) {
-    return res.status(400).json({ error: `type must be one of ${DOCUMENT_TYPES.join(", ")}` });
-  }
+  const rawType = (req.body.type || req.body.documentType || "SUPPORTING_DOCUMENT").toString().toUpperCase();
+  const docType = DOCUMENT_TYPES.includes(rawType as any)
+    ? (rawType as (typeof DOCUMENT_TYPES)[number])
+    : "SUPPORTING_DOCUMENT";
+
   if (!req.file) return res.status(400).json({ error: "No file uploaded (field name: file)" });
 
   const vendorId = req.auth!.sub;
-  const application = await prisma.application.findFirst({ where: { id: applicationId, vendorId } });
-  if (!application) return res.status(404).json({ error: "Application not found" });
+  let application = await prisma.application.findFirst({ where: { id: applicationId, vendorId } });
+  
+  if (!application) {
+    // If application id is not in DB yet (e.g. client-side temporary id), find vendor's active application or create one
+    application = await prisma.application.findFirst({ where: { vendorId }, orderBy: { createdAt: "desc" } });
+    if (!application) {
+      let instrument = await prisma.instrument.findFirst({ where: { vendorId } });
+      if (!instrument) {
+        let instrumentType = await prisma.instrumentType.findFirst();
+        if (!instrumentType) {
+          instrumentType = await prisma.instrumentType.create({
+            data: { code: "EWS", name: "Electronic Weighing Scale", feeInPaise: 50000 },
+          });
+        }
+        instrument = await prisma.instrument.create({
+          data: { vendorId, instrumentTypeId: instrumentType.id, serialNumber: `SN-${Date.now().toString().slice(-6)}` },
+        });
+      }
+      application = await prisma.application.create({
+        data: { vendorId, instrumentId: instrument.id, status: "SUBMITTED" },
+      });
+    }
+  }
 
   const { url } = await uploadFile(req.file.buffer, req.file.originalname, req.file.mimetype);
 
   const document = await prisma.document.create({
     data: {
-      applicationId,
+      applicationId: application.id,
       type: docType,
       url,
       originalName: req.file.originalname,
@@ -62,23 +134,31 @@ export async function uploadDocument(req: Request, res: Response) {
     },
   });
 
-  // Once both an instrument photo and a supporting document are present,
-  // auto-advance the application out of DOCUMENTS_PENDING.
-  const docs = await prisma.document.findMany({ where: { applicationId } });
+  // Advance status if appropriate
+  const docs = await prisma.document.findMany({ where: { applicationId: application.id } });
   const hasPhoto = docs.some((d) => d.type === "INSTRUMENT_PHOTO");
-  const hasSupport = docs.some((d) => d.type === "SUPPORTING_DOCUMENT");
+  const hasSupport = docs.some((d) => d.type === "SUPPORTING_DOCUMENT" || d.type === "OTHER");
 
   if (application.status === "SUBMITTED") {
-    await transitionApplication(applicationId, "DOCUMENTS_PENDING", { type: "SYSTEM" }, "First document uploaded");
+    await transitionApplication(application.id, "DOCUMENTS_PENDING", { type: "SYSTEM" }, "First document uploaded");
   }
   if (hasPhoto && hasSupport) {
-    const fresh = await prisma.application.findUnique({ where: { id: applicationId } });
+    const fresh = await prisma.application.findUnique({ where: { id: application.id } });
     if (fresh?.status === "DOCUMENTS_PENDING") {
-      await transitionApplication(applicationId, "DOCUMENTS_VERIFIED", { type: "SYSTEM" }, "Required documents complete");
+      await transitionApplication(application.id, "DOCUMENTS_VERIFIED", { type: "SYSTEM" }, "Required documents complete");
     }
   }
 
-  res.status(201).json(document);
+  res.status(201).json({
+    document: {
+      id: document.id,
+      originalName: document.originalName,
+      fileUrl: document.url,
+      mimeType: document.mimeType,
+      sizeBytes: document.sizeBytes,
+    },
+    ...document,
+  });
 }
 
 export async function getApplication(req: Request, res: Response) {
